@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Controls Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+<style>
+  :root{
+    --bg:#f3f6fb; --card:#ffffff; --ink:#1b2a41; --muted:#5d6b82; --line:#e3e9f2; --soft:#f7f9fc;
+    --blue-900:#0b2a5b; --blue-700:#1450a3; --blue-500:#2f7de1; --blue-100:#e7f0fd;
+    --green:#1f9d55; --green-bg:#e3f5ea; --orange:#e08a00; --orange-bg:#fdf1dc; --red:#d64045; --red-bg:#fbe5e6; --grey:#94a3b8;
+    --shadow:0 1px 2px rgba(16,42,84,.06),0 6px 18px rgba(16,42,84,.08);
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  button{font:inherit;cursor:pointer}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;background:#eef3fa;border-radius:4px;padding:0 4px;color:#23406b;word-break:break-word}
+
+  header{background:linear-gradient(120deg,var(--blue-900) 0%,var(--blue-700) 55%,var(--blue-500) 100%);color:#fff;padding:22px 16px 26px}
+  .wrap{max-width:1240px;margin:0 auto}
+  .head-row{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px}
+  .eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.75;margin:0 0 4px}
+  h1{margin:0;font-size:clamp(22px,3.2vw,30px);font-weight:700;letter-spacing:-.01em}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .chip{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:4px 12px;font-size:13px;white-space:nowrap}
+  .chip.sample{background:#fff3cd;color:#6b4e00;border-color:#ffe08a;font-weight:700}
+  .head-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{border:1px solid transparent;border-radius:10px;padding:9px 14px;font-weight:600;font-size:14px;transition:background .15s,border-color .15s}
+  .btn-light{background:#fff;color:var(--blue-700)} .btn-light:hover{background:var(--blue-100)}
+  .btn-ghost{background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.35)} .btn-ghost:hover{background:rgba(255,255,255,.22)}
+  .btn-outline{background:#fff;color:var(--blue-700);border-color:#c9d8ef} .btn-outline:hover{background:var(--blue-100)}
+  .btn-primary{background:var(--blue-700);color:#fff} .btn-primary:hover{background:var(--blue-900)}
+  .btn-sm{padding:6px 10px;font-size:13px;border-radius:8px}
+
+  main{padding:22px 16px 40px}
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--line)}
+
+  #dropzone{padding:40px 20px;text-align:center;border:2px dashed #b9cbe6;background:#fbfdff;transition:border-color .15s,background .15s}
+  body.drag #dropzone{border-color:var(--blue-500);background:var(--blue-100)}
+  #dropzone h2{margin:12px 0 6px;font-size:20px}
+  #dropzone p{margin:0 auto;max-width:640px;color:var(--muted)}
+  .dz-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px}
+  .hint{margin:22px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;text-align:left;max-width:900px}
+  .hint div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:13px;color:var(--muted)}
+  .hint b{color:var(--ink);display:block;margin-bottom:3px;font-size:14px}
+  .privacy{margin-top:16px;font-size:12.5px;color:var(--muted)}
+  body.drag #dash::before{content:"Drop to add files";position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(20,80,163,.12);border:3px dashed var(--blue-500);font-size:22px;font-weight:700;color:var(--blue-700);z-index:50}
+
+  #msgs .msg{margin-bottom:12px;padding:12px 16px;border-radius:10px;font-size:14px;display:flex;gap:12px;justify-content:space-between;align-items:flex-start}
+  #msgs .msg.err{background:var(--red-bg);color:#8a1f24;border:1px solid #f2c2c4}
+  #msgs .msg.warn{background:var(--orange-bg);color:#6e4300;border:1px solid #f3d7a3}
+  #msgs .msg ol{margin:6px 0 0 18px;padding:0}
+  #msgs .x{background:none;border:0;font-size:18px;line-height:1;color:inherit;opacity:.6}
+
+  #dash{display:none}
+  .section-title{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:28px 0 12px;flex-wrap:wrap}
+  .section-title h2{margin:0;font-size:16px;font-weight:700}
+  .section-title span{font-size:12.5px;color:var(--muted)}
+
+  .files{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;padding:12px 14px}
+  .file{flex:1 1 260px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--soft);font-size:12.5px;color:var(--muted)}
+  .file b{color:var(--ink);font-size:13.5px;display:block;word-break:break-all}
+  .file ul{margin:4px 0 0 16px;padding:0}
+  .files-actions{display:flex;flex-direction:column;gap:8px;justify-content:center}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+  .kpi{padding:16px 18px 14px;display:flex;flex-direction:column}
+  .kpi-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .kpi-name{font-weight:700;font-size:14.5px}
+  .kpi-formula{font-size:12px;color:var(--muted)}
+  .gauge{width:100%;max-width:230px;margin:6px auto 0;display:block}
+  .gauge .val{font-size:30px;font-weight:700;fill:var(--ink)}
+  .gauge .val.na{fill:#a0abbd}
+  .gauge .lim{font-size:10px;fill:var(--muted)}
+  .pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+  .pill.green{background:var(--green-bg);color:#16723e} .pill.orange{background:var(--orange-bg);color:#8a5400}
+  .pill.red{background:var(--red-bg);color:#a3262b} .pill.blue{background:var(--blue-100);color:var(--blue-700)} .pill.grey{background:#eef1f5;color:#5d6b82}
+  .kpi-foot{margin-top:4px;text-align:center;font-size:13px;color:var(--muted)}
+  .kpi-foot b{color:var(--ink);font-weight:600}
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+  .cmp div{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;color:var(--muted)}
+  .cmp b{display:block;font-size:16px;color:var(--ink)}
+  .flag{margin-top:8px;background:var(--orange-bg);color:#7a4a00;border:1px solid #f3d7a3;border-radius:8px;padding:6px 9px;font-size:12px;font-weight:600}
+  .src{margin-top:10px;padding-top:9px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--muted);line-height:1.55}
+  .src b{color:#40506a;font-weight:700;margin-right:4px}
+  .src.need{color:#8a1f24}
+  .neg{color:var(--red)!important} .pos{color:var(--green)!important}
+
+  .figs{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));overflow:hidden}
+  .fig{padding:13px 15px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .fig .l{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .fig .v{font-size:18px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+  .fig .s{font-size:11px;color:var(--muted);margin-top:2px;word-break:break-word}
+
+  .q-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:14px 16px}
+  .q{display:grid;grid-template-columns:26px 1fr;gap:10px;padding:12px 16px;border-top:1px solid var(--line)}
+  .q .ic{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff}
+  .q.warn .ic{background:var(--orange)} .q.ok .ic{background:var(--green)} .q.na .ic{background:#b6c2d4}
+  .q-title{font-weight:700;font-size:14px}
+  .q-msg{font-size:13px;color:var(--muted)}
+  .q details{margin-top:6px;font-size:12.5px}
+  .q summary{cursor:pointer;color:var(--blue-700);font-weight:600}
+  .q ul{margin:6px 0 0 18px;padding:0} .q li{margin:3px 0}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .grid21{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .panel{padding:16px 18px 14px}
+  .panel h3{margin:0;font-size:14.5px}
+  .panel .sub{margin:2px 0 10px;font-size:12.5px;color:var(--muted)}
+  .chart-box{position:relative;height:320px}
+  .empty{padding:22px;text-align:center;color:var(--muted);font-size:13.5px;background:var(--soft);border:1px dashed #cbd6e6;border-radius:10px}
+  .empty b{display:block;color:var(--ink);margin-bottom:4px}
+
+  .bignum{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 8px}
+  .bignum div{flex:1 1 80px}
+  .bignum .n{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+  .bignum .t{font-size:12px;color:var(--muted)}
+  .sbar{display:flex;height:10px;border-radius:6px;overflow:hidden;background:#eef1f5}
+  .dates{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+  .dates div{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--muted)}
+  .dates b{display:block;font-size:16px;color:var(--ink)}
+
+  .thresholds{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin-top:12px}
+  .thresholds i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+
+  .tbl-wrap{overflow:auto;max-height:440px;border:1px solid var(--line);border-radius:10px}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .tbl th{position:sticky;top:0;background:#f1f5fb;text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .tbl td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  .tbl td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tbl tr:hover td{background:#fafcff}
+
+  .g-controls{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:13px;margin-bottom:10px}
+  .g-controls label{display:flex;gap:6px;align-items:center;cursor:pointer}
+  .g-controls input[type=number]{width:56px;padding:4px 6px;border:1px solid #c9d8ef;border-radius:6px;font:inherit}
+  .g-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);margin-left:auto}
+  .g-legend i{display:inline-block;width:16px;height:8px;border-radius:2px;margin-right:5px;vertical-align:0}
+  .g-scroll{overflow:auto;max-height:620px;border:1px solid var(--line);border-radius:10px;background:#fff}
+  .g-inner{position:relative}
+  .g-row{display:flex;height:26px;border-bottom:1px solid #f0f3f8}
+  .g-row.g-grp{background:#f4f7fc;height:24px}
+  .g-row.g-grp .g-lbl{font-weight:700;color:var(--blue-900);background:#f4f7fc;line-height:24px}
+  .g-head{position:sticky;top:0;z-index:4;height:30px;background:#f1f5fb;border-bottom:1px solid var(--line)}
+  .g-lbl{position:sticky;left:0;z-index:3;flex:none;background:#fff;border-right:1px solid var(--line);padding:0 8px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:26px}
+  .g-head .g-lbl{background:#f1f5fb;font-weight:700;color:var(--muted);line-height:30px;z-index:5}
+  .g-lbl .code{color:var(--muted);margin-right:6px}
+  .g-track{position:relative;flex:none}
+  .g-tick{position:absolute;top:0;bottom:0;border-left:1px solid #e3e9f2;font-size:10.5px;color:var(--muted);padding-left:3px;line-height:30px;white-space:nowrap}
+  .g-bar{position:absolute;border-radius:3px}
+  .g-bar.plan{top:4px;height:6px;background:#cfd8e6}
+  .g-bar.cur{top:12px;height:9px}
+  .g-ms{position:absolute;width:9px;height:9px;transform:rotate(45deg);top:12px}
+  .g-ms.plan{top:3px;width:7px;height:7px;background:#b6c2d4}
+  .g-dd{position:absolute;top:30px;bottom:0;border-left:2px dashed var(--red);z-index:2;pointer-events:none}
+  .g-dd span{position:absolute;top:2px;left:4px;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;white-space:nowrap}
+  .g-note{font-size:12px;color:var(--muted);margin-top:8px}
+
+  footer{max-width:1240px;margin:0 auto;padding:0 16px 30px;font-size:12px;color:var(--muted)}
+
+  @media (max-width:900px){ .grid2,.grid21{grid-template-columns:1fr} .chart-box{height:280px} }
+  @media (max-width:560px){
+    header{padding:18px 16px 20px} .head-actions .btn{padding:8px 11px;font-size:13px}
+    .kpis{grid-template-columns:1fr 1fr;gap:10px} .kpi{padding:12px 10px} .gauge .val{font-size:34px}
+    .kpi-name{font-size:13px} .kpi-formula{display:none} .kpi-foot{font-size:11.5px} .cmp{grid-template-columns:1fr} .cmp b{font-size:14px}
+    .g-legend{margin-left:0}
+  }
+  @media (max-width:380px){ .kpis{grid-template-columns:1fr} }
+  @media print{ body{background:#fff} .head-actions,#upload,#msgs,.files-actions,.g-controls label{display:none!important} header{-webkit-print-color-adjust:exact;print-color-adjust:exact} .card{box-shadow:none;break-inside:avoid} .grid2,.grid21{grid-template-columns:1fr} .g-scroll,.tbl-wrap{max-height:none;overflow:visible} }
+
+  /* ---- Part 3: monthly tool ---- */
+  .monthbar{padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;margin-bottom:14px}
+  .mb-nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .mb-nav select{font:inherit;font-weight:700;padding:7px 10px;border:1px solid #c9d8ef;border-radius:8px;background:#fff;color:var(--ink);min-width:150px}
+  .icon-btn{border:1px solid #c9d8ef;background:#fff;color:var(--blue-700);border-radius:8px;width:34px;height:34px;font-size:15px;line-height:1}
+  .icon-btn:disabled{opacity:.35;cursor:default}
+  .mb-info{font-size:12.5px;color:var(--muted);flex:1 1 260px}
+  .mb-info b{color:var(--ink)}
+  .mb-actions{display:flex;flex-wrap:wrap;gap:6px}
+  .meter{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .meter .bar{width:90px;height:7px;border-radius:4px;background:#e8edf5;overflow:hidden}
+  .meter .bar i{display:block;height:100%;background:var(--blue-500)}
+  .meter.hi .bar i{background:var(--red)} .meter.hi{color:#8a1f24;font-weight:700}
+  .how{width:100%;font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:8px}
+  .linkbtn{background:none;border:0;color:var(--blue-700);font-weight:700;padding:0;text-decoration:underline;cursor:pointer;font-size:inherit}
+  .msg .acts{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+  .btn-danger{background:var(--red);color:#fff}
+  .btn-danger:hover{background:#b3262b}
+  input[type=month]{font:inherit;padding:5px 8px;border:1px solid #c9d8ef;border-radius:8px}
+
+  .psec .section-title{align-items:center}
+  .psec .section-title h2{flex:1}
+  .handle{cursor:grab;color:#9aa8bd;font-size:16px;letter-spacing:-2px;user-select:none;padding:0 4px;touch-action:none}
+  .handle:active{cursor:grabbing}
+  .mv{display:inline-flex;gap:2px}
+  .mv button{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:6px;width:24px;height:22px;font-size:11px;line-height:1;padding:0}
+  .psec.dragging{opacity:.45}
+  .psec.drop-before{box-shadow:0 -3px 0 var(--blue-500)}
+  .psec.drop-after{box-shadow:0 3px 0 var(--blue-500)}
+
+  .tl-wrap{overflow-x:auto}
+  .tl-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin-top:6px}
+  .tl-legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+  .grid4{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .cmp-ctrl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;margin-bottom:10px}
+  .cmp-ctrl select{font:inherit;padding:5px 8px;border:1px solid #c9d8ef;border-radius:8px}
+  .chg-good{color:var(--green);font-weight:700} .chg-bad{color:var(--red);font-weight:700}
+  .tbl tr.sub td{background:#f7f9fc;font-weight:700;color:var(--blue-900)}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1b2a41;color:#fff;padding:10px 16px;border-radius:10px;font-size:13.5px;box-shadow:var(--shadow);z-index:80;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+  .toast.show{opacity:1}
+  .act-btns{display:flex;gap:4px;flex-wrap:wrap}
+  .act-btns button{border:1px solid #c9d8ef;background:#fff;color:var(--blue-700);border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600}
+  .act-btns button.confirm{background:var(--red);border-color:var(--red);color:#fff}
+  @media (max-width:900px){ .grid4{grid-template-columns:1fr} }
+  @media print{ .monthbar .mb-actions,.monthbar .icon-btn,.handle,.mv,.act-btns,#monthsSec{display:none!important} }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap head-row">
+    <div>
+      <p class="eyebrow">Project Controls Dashboard</p>
+      <h1 id="projName">Cost &amp; Schedule Performance</h1>
+      <div class="meta" id="metaChips"><span class="chip">Load a cost report and/or a schedule to begin</span></div>
+    </div>
+    <div class="head-actions" id="headActions" style="display:none">
+      <button class="btn btn-light" id="btnAdd">Add files</button>
+      <button class="btn btn-ghost" onclick="window.print()">Print / PDF</button>
+      <button class="btn btn-ghost" data-act="m-delete-all" title="Delete all stored months from this browser">Clear data</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="msgs"></div>
+
+  <section id="upload">
+    <div class="card" id="dropzone">
+      <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#2f7de1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg>
+      <h2>Drop your cost report and schedule here</h2>
+      <p>Cost report as .xlsx / .xls / .csv, schedule as Primavera P6 <b>.xer</b> or MS Project / P6 <b>.xml</b>. Drop them together or one after the other. Sheets are recognised by their column headers, not by their names.</p>
+      <div class="dz-actions">
+        <button class="btn btn-primary" id="btnPick">Choose files</button>
+        <button class="btn btn-outline" id="btnSample">Try with sample data</button>
+        <button class="btn btn-outline" id="btnTplCost">Sample cost report (.xlsx)</button>
+        <button class="btn btn-outline" id="btnTplXer">Sample schedule (.xer)</button>
+      </div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv,.xer,.xml,.mpp" multiple hidden>
+      <div class="hint">
+        <div><b>KPI summary</b><code>Metric</code> | <code>Value</code> with rows such as Project name, Data date, Currency, BAC, PV, EV, AC, SPI, CPI, EAC.</div>
+        <div><b>Monthly trend</b><code>Month</code> | <code>Planned cumulative</code> | <code>Actual cumulative</code> | <code>SPI</code> | <code>CPI</code>, optional <code>Earned cumulative</code>.</div>
+        <div><b>Optional cost sheets</b>Phase / CBS (<code>Phase</code> + <code>Budget</code>), work packages (<code>Work package</code> + <code>Budget</code>), issues / risk log (<code>Title</code> + <code>Priority</code> / <code>Cost impact</code>).</div>
+        <div><b>Schedule</b>P6 .xer or .xml, or MS Project .xml (File › Save As › XML). Activities, WBS, planned and current dates, % complete, total float, logic and data date are read.</div>
+      </div>
+      <div class="privacy">Files are read inside this browser only. Nothing is uploaded anywhere.</div>
+    </div>
+  </section>
+
+  <section id="dash">
+    <div class="card monthbar" id="monthBar"></div>
+    <div class="card files" id="filesPanel"></div>
+
+    <div id="panels">
+    <section class="psec" data-pid="kpi">
+      <div class="section-title"><h2>Cost performance</h2><span id="costNote"></span></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="thresholds">
+        <span><i style="background:var(--green)"></i>≥ 1.00 on / better than plan</span>
+        <span><i style="background:var(--orange)"></i>0.90 – 0.99 watch</span>
+        <span><i style="background:var(--red)"></i>&lt; 0.90 action needed</span>
+        <span>Every value shows its source cell or formula. “—” means the input is missing.</span>
+      </div>
+    </section>
+
+    <section class="psec" data-pid="figs">
+      <div class="section-title"><h2>Key figures</h2><span>Source cell or formula under each value</span></div>
+      <div class="card figs" id="figs"></div>
+    </section>
+
+    <section class="psec" data-pid="quality">
+      <div class="section-title"><h2>Data quality</h2><span id="qNote"></span></div>
+      <div class="card" id="quality"></div>
+    </section>
+
+    <section class="psec" data-pid="timeline">
+      <div class="section-title"><h2>Project timeline</h2><span id="tlNote"></span></div>
+      <div class="card panel" id="timeline"></div>
+    </section>
+
+    <section class="psec" data-pid="lifecycle">
+      <div class="section-title"><h2>Project lifecycle (all stored months)</h2><span id="lcNote"></span></div>
+      <div class="grid4">
+        <div class="card panel"><h3>SPI &amp; CPI by reporting month</h3><p class="sub">Calculated from each month's EV, PV and AC</p><div id="lcIdx"></div></div>
+        <div class="card panel"><h3>PV, EV, AC and EAC by reporting month</h3><p class="sub">Cumulative values at each data date, BAC dashed</p><div id="lcCost"></div></div>
+        <div class="card panel"><h3>Progress by reporting month</h3><p class="sub">Cost (EV ÷ BAC) vs schedule (duration-weighted)</p><div id="lcProg"></div></div>
+        <div class="card panel"><h3>Forecast finish slip by reporting month</h3><p class="sub">Forecast − planned finish, calendar days</p><div id="lcSlip"></div></div>
+      </div>
+    </section>
+
+    <section class="psec" data-pid="compare">
+      <div class="section-title"><h2>Month vs month</h2><span id="cmpNote"></span></div>
+      <div class="card panel" id="compare"></div>
+    </section>
+
+    <section class="psec" data-pid="sched">
+      <div class="section-title"><h2>Schedule</h2><span id="schedNote"></span></div>
+      <div id="schedCards"></div>
+    </section>
+
+    <section class="psec" data-pid="trends">
+      <div class="section-title"><h2>Cost trend (this month's report)</h2></div>
+      <div class="grid21">
+        <div class="card panel"><h3>Cumulative cost curve</h3><p class="sub">Planned value (PV) vs actual cost (AC), cumulative by month</p><div id="sCurveWrap"></div></div>
+        <div class="card panel"><h3>SPI &amp; CPI by month</h3><p class="sub">As reported in the trend sheet, against 1.00</p><div id="idxWrap"></div></div>
+      </div>
+    </section>
+
+    <section class="psec" data-pid="breakdown">
+      <div class="section-title"><h2>Breakdowns</h2></div>
+      <div class="grid2">
+        <div class="card panel"><h3>Budget by phase</h3><p class="sub">Share of total budget per phase / CBS element</p><div id="phaseWrap"></div></div>
+        <div class="card panel"><h3>Activity status by WBS</h3><p class="sub">Number of activities per top-level WBS element</p><div id="wbsWrap"></div></div>
+      </div>
+    </section>
+
+    <section class="psec" data-pid="gantt">
+      <div class="section-title"><h2>Gantt</h2><span id="ganttNote"></span></div>
+      <div class="card panel" id="ganttPanel">
+        <div class="g-controls" id="gControls">
+          <label><input type="checkbox" id="fOpen"> Open activities only</label>
+          <label><input type="checkbox" id="fCrit"> Critical / near-critical only</label>
+          <label>Near-critical = total float ≤ <input type="number" id="nearDays" value="10" min="0" step="1"> days</label>
+          <div class="g-legend">
+            <span><i style="background:#cfd8e6"></i>Planned</span>
+            <span><i style="background:var(--blue-500)"></i>Current</span>
+            <span><i style="background:var(--red)"></i>Critical (TF ≤ 0)</span>
+            <span><i style="background:var(--orange)"></i>Near-critical</span>
+            <span><i style="background:var(--grey)"></i>Complete</span>
+            <span><i style="background:none;border-top:2px dashed var(--red);height:0;width:16px"></i>Data date</span>
+          </div>
+        </div>
+        <div id="gantt"></div>
+      </div>
+    </section>
+
+    <section class="psec" data-pid="issues">
+      <div class="section-title"><h2>Open issues &amp; risks</h2><span id="issuesNote"></span></div>
+      <div class="card panel" id="issues"></div>
+    </section>
+
+    <section class="psec" data-pid="wps">
+      <div class="section-title"><h2>Work packages</h2><span id="wpNote"></span></div>
+      <div class="card panel" id="wps"></div>
+    </section>
+
+    <section class="psec" data-pid="months" id="monthsSec">
+      <div class="section-title"><h2>Stored months</h2><span id="monthsNote"></span></div>
+      <div class="card panel" id="monthsTable"></div>
+    </section>
+    </div>
+  </section>
+</main>
+<footer class="wrap" id="foot">Built by Sara Mostafshar with Claude. Files are read in your browser only. · <a href="project-controls-dashboard-with-sample-data.zip" download>Download sample data (4 months)</a></footer>
+
+<!-- ======================= CORE: parsing, calculations, checks (no DOM rendering) ======================= -->
+<script id="pc-core">
+(function(root){
+  'use strict';
+  const norm = s => String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9%]+/g,' ').trim();
+  const blank = v => v == null || String(v).trim() === '';
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const pad = n => String(n).padStart(2,'0');
+  const TOL_IDX = 0.005;   // SPI/CPI comparison tolerance (half of the 2nd decimal)
+
+  // ---------- numbers ----------
+  function parseNum(v){
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return isFinite(v) ? v : null;
+    if (v instanceof Date || typeof v === 'boolean') return null;
+    let s = String(v).trim();
+    if (!/\d/.test(s)) return null;
+    const pct = /%\s*$/.test(s);
+    s = s.replace(/[^\d,.\-()]/g,'');
+    const neg = /^\(.*\)$/.test(s) || /^-/.test(s);
+    s = s.replace(/[()\-]/g,'');
+    if (s.includes(',') && s.includes('.')) {
+      s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
+    } else if ((s.match(/\./g) || []).length > 1) {
+      s = s.replace(/\./g,'');
+    } else if (s.includes(',')) {
+      const parts = s.split(',');
+      s = (parts.length === 2 && parts[1].length !== 3) ? s.replace(',','.') : s.replace(/,/g,'');
+    }
+    let n = parseFloat(s);
+    if (!isFinite(n)) return null;
+    if (neg) n = -n;
+    if (pct) n /= 100;
+    return n;
+  }
+  function fmtMoney(n, cur, plus){
+    if (n == null || !isFinite(n)) return '—';
+    const a = Math.abs(n), sign = n < 0 ? '−' : (plus && n > 0 ? '+' : '');
+    let s;
+    if (a >= 1e9) s = (a/1e9).toFixed(2) + ' bn';
+    else if (a >= 1e6) s = (a/1e6).toFixed(2) + ' M';
+    else if (a >= 1e3) s = (a/1e3).toFixed(1) + ' k';
+    else s = a.toFixed(0);
+    return sign + (cur || '') + s;
+  }
+  const r2 = v => v == null || !isFinite(v) ? '—' : v.toFixed(2);
+
+  // ---------- dates ----------
+  const dayOnly = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
+  function cellDate(v){
+    if (v instanceof Date && !isNaN(v)) return dayOnly(new Date(v.getTime() + 2*3600e3));
+    if (typeof v === 'number' && v > 20000 && v < 80000){ const u = new Date(Math.round((v - 25569) * 864e5)); return new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate(), 12); }
+    if (typeof v === 'string'){
+      const s = v.trim(); let m;
+      if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return new Date(+m[1], m[2]-1, +m[3], 12);
+      if ((m = s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/))) return new Date(+m[3], m[2]-1, +m[1], 12); // day-first
+      if ((m = s.match(/^(\d{4})[-/.](\d{1,2})$/)) && +m[2] >= 1 && +m[2] <= 12) return new Date(+m[1], +m[2], 0, 12);              // 2025-12 = month end
+      if ((m = s.match(/^([A-Za-z]{3})[A-Za-z]*[ -](\d{2}|\d{4})$/))){ const mi = MON.findIndex(x => x.toLowerCase() === m[1].toLowerCase()); if (mi >= 0) return new Date(+m[2] < 100 ? 2000 + +m[2] : +m[2], mi + 1, 0, 12); }
+      if ((m = s.match(/^(\d{1,2})[ -]([A-Za-z]{3})[A-Za-z]*[ -](\d{4})$/))){ const mi = MON.findIndex(x => x.toLowerCase() === m[2].toLowerCase()); if (mi >= 0) return new Date(+m[3], mi, +m[1], 12); }
+    }
+    return null;
+  }
+  function parseDT(s){
+    if (blank(s)) return null;
+    const m = String(s).trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+    return m ? new Date(+m[1], m[2]-1, +m[3], +(m[4]||0), +(m[5]||0)) : null;
+  }
+  const fmtD = d => d ? `${pad(d.getDate())} ${MON[d.getMonth()]} ${d.getFullYear()}` : '—';
+  const fmtCellDate = v => { const d = cellDate(v); return d ? fmtD(d) : (blank(v) ? '' : String(v).trim()); };
+  const monthLabel = v => { const d = cellDate(v); return d ? `${MON[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` : String(v).trim(); };
+  const dayDiff = (a,b) => Math.round((dayOnly(b) - dayOnly(a)) / 864e5);
+
+  function detectCurrency(s){
+    s = String(s || '');
+    if (/€|\beur\b/i.test(s)) return '€';
+    if (/\$|\busd\b/i.test(s)) return '$';
+    if (/£|\bgbp\b/i.test(s)) return '£';
+    const m = s.match(/\b(sek|nok|dkk|chf|aed|sar|qar|inr|aud|cad)\b/i);
+    return m ? m[1].toUpperCase() + ' ' : '';
+  }
+
+  // ---------- sheet helpers ----------
+  function sheetTable(X, ws, file, sheet, single){
+    if (!ws || !ws['!ref']) return null;
+    const rg = X.utils.decode_range(ws['!ref']);
+    const rows = X.utils.sheet_to_json(ws, { header:1, raw:true, defval:null, blankrows:true });
+    const prefix = single ? file : (/^[A-Za-z0-9_]+$/.test(sheet) ? sheet : `'${sheet}'`);
+    const col = c => X.utils.encode_col(rg.s.c + c);
+    return { rows, file, sheet: single ? file : sheet,
+      rowNo: r => rg.s.r + r + 1,
+      cell: (r,c) => `${prefix}!${col(c)}${rg.s.r + r + 1}`,
+      range: (r1,r2,c) => `${prefix}!${col(c)}${rg.s.r + r1 + 1}:${col(c)}${rg.s.r + r2 + 1}` };
+  }
+  function findHeaderRow(t, test){
+    for (let r = 0; r < Math.min(t.rows.length, 25); r++){
+      const row = t.rows[r]; if (!row) continue;
+      const h = row.map(norm);
+      if (test(h)) return { r, h, raw: row.map(x => blank(x) ? '' : String(x).trim()) };
+    }
+    return null;
+  }
+  const idx = (h, re, avoid) => h.findIndex(x => x && re.test(x) && !(avoid && avoid.test(x)));
+  function idxPref(h, re, pref, avoid){
+    const all = h.map((x,i) => i).filter(i => h[i] && re.test(h[i]) && !(avoid && avoid.test(h[i])));
+    if (!all.length) return -1;
+    const p = all.find(i => pref.test(h[i]));
+    return p != null ? p : all[0];
+  }
+  const isTotal = v => /^(total|grand total|sum|totals)\b/.test(norm(v));
+
+  // ---------- cost sheet detectors ----------
+  const KPI_KEYS = [
+    ['name',     /^(project( name| title)?|name)\b/],
+    ['dataDate', /(data date|status date|report(ing)? date|cut ?off|as of|period end)/],
+    ['currency', /^currency\b/],
+    ['bac',      /^(bac\b|budget at completion|total budget\b|budget$|approved budget)/],
+    ['pv',       /^(pv\b|planned value|bcws)/],
+    ['ev',       /^(ev\b|earned value|bcwp)/],
+    ['ac',       /^(ac\b|actual cost|acwp)/],
+    ['spi',      /^(spi\b|schedule performance index)/],
+    ['cpi',      /^(cpi\b|cost performance index)/],
+    ['eac',      /^(eac\b|fac\b|estimate at completion|forecast at completion|forecast final cost|forecast cost)/],
+    ['pct',      /^(% complete|percent complete|overall progress|physical progress|progress|% progress)/],
+  ];
+
+  function detectKPI(t){
+    let mi = -1, vi = -1;
+    const hit = findHeaderRow(t, h => {
+      mi = h.findIndex(x => /^(metric|kpi|item|parameter|indicator|measure)s?\b/.test(x));
+      vi = h.findIndex((x,i) => i !== mi && /^(value|amount|result|figure)s?\b/.test(x));
+      return mi >= 0 && vi >= 0;
+    });
+    if (!hit) return null;
+    const items = {}; let hint = '', last = hit.r;
+    for (let r = hit.r + 1; r < t.rows.length; r++){
+      const row = t.rows[r] || []; const label = row[mi];
+      if (blank(label)) continue;
+      last = r;
+      const n = norm(label);
+      for (const [key, re] of KPI_KEYS){
+        if (re.test(n) && !items[key]){
+          items[key] = { raw: row[vi], ref: t.cell(r, vi), label: String(label).trim() };
+          if (['bac','pv','ev','ac','eac'].includes(key) && !hint) hint = detectCurrency(label) || detectCurrency(row[vi]);
+          break;
+        }
+      }
+    }
+    return { type:'kpi', file:t.file, sheet:t.sheet, items, currencyHint:hint, rowsTxt:`rows ${t.rowNo(hit.r)}–${t.rowNo(last)}` };
+  }
+
+  function detectTrend(t){
+    let c = null;
+    const cumPref = /\bcum|to date|\bctd\b|\bitd\b|\btotal\b/;
+    const hit = findHeaderRow(t, h => {
+      const m = idx(h, /^(month|period|date|reporting period|report month|period end)\b/);
+      const p = idxPref(h, /\b(planned|plan|pv|bcws|baseline)\b/, cumPref, /\b(spi|monthly|period)\b/);
+      const a = idxPref(h, /\b(actual|actuals|ac|acwp)\b/, cumPref, /\b(cpi|monthly|period)\b/);
+      if (m < 0 || p < 0 || a < 0) return false;
+      c = { m, p, a, e: idxPref(h, /\b(earned|ev|bcwp)\b/, cumPref, /\b(monthly|period)\b/),
+            s: idx(h, /^spi\b|schedule performance/), k: idx(h, /^cpi\b|cost performance/) };
+      return true;
+    });
+    if (!hit) return null;
+    const rows = [];
+    for (let r = hit.r + 1; r < t.rows.length; r++){
+      const row = t.rows[r] || []; const m = row[c.m];
+      if (blank(m) || isTotal(m)) continue;
+      const g = i => i >= 0 ? parseNum(row[i]) : null;
+      const o = { row: t.rowNo(r), label: monthLabel(m), date: cellDate(m), pv:g(c.p), ac:g(c.a), ev:g(c.e), spi:g(c.s), cpi:g(c.k),
+        refs:{ month:t.cell(r,c.m), pv:t.cell(r,c.p), ac:t.cell(r,c.a), ev:c.e>=0?t.cell(r,c.e):null, spi:c.s>=0?t.cell(r,c.s):null, cpi:c.k>=0?t.cell(r,c.k):null } };
+      if (o.pv == null && o.ac == null && o.ev == null) continue;
+      rows.push(o);
+    }
+    if (!rows.length) return null;
+    const nm = i => i >= 0 ? hit.raw[i] : null;
+    return { type:'trend', file:t.file, sheet:t.sheet, rows, hasEV:c.e >= 0, hasSPI:c.s >= 0, hasCPI:c.k >= 0,
+      colNames:{ pv:nm(c.p), ac:nm(c.a), ev:nm(c.e), spi:nm(c.s), cpi:nm(c.k), month:nm(c.m) },
+      rowsTxt:`rows ${rows[0].row}–${rows[rows.length-1].row}` };
+  }
+
+  const PHASE_RE = /\b(phase|phases|cbs|cost element|discipline|cost code|stage|cost category|cost breakdown)\b/;
+  const WP_RE = /\b(work packages?|wp|wbs|control accounts?|cost accounts?)\b/;
+  const WP_NAME_RE = /\b(work packages?|control accounts?|cost accounts?)\b/;
+  const BUD_RE = /\b(budget|bac|baseline)\b/;
+
+  function detectPhase(t){
+    let c = null;
+    const hit = findHeaderRow(t, h => {
+      if (!h.some(x => PHASE_RE.test(x)) || h.some(x => WP_RE.test(x) || /\b(month|metric)\b/.test(x))) return false;
+      const b = idxPref(h, /\b(budget|bac|baseline|amount)\b/, /\b(budget|bac)\b/, /\b(remaining|variance|actual)\b/);
+      if (b < 0) return false;
+      c = { n: idxPref(h, PHASE_RE, /\b(name|description)\b/), b,
+            a: idx(h, /\b(actual|actuals|ac|spent|cost to date)\b/), f: idx(h, /\b(eac|fac|forecast)\b/) };
+      return true;
+    });
+    if (!hit) return null;
+    const items = []; let total = null, r1 = null, r2 = null;
+    for (let r = hit.r + 1; r < t.rows.length; r++){
+      const row = t.rows[r] || []; const name = row[c.n]; const bud = parseNum(row[c.b]);
+      if (blank(name)) continue;
+      if (isTotal(name)){ if (bud != null) total = { v:bud, ref:t.cell(r,c.b) }; continue; }
+      if (bud == null) continue;
+      if (r1 == null) r1 = r; r2 = r;
+      items.push({ name:String(name).trim(), budget:bud, ref:t.cell(r,c.b), row:t.rowNo(r),
+        actual: c.a >= 0 ? parseNum(row[c.a]) : null, eac: c.f >= 0 ? parseNum(row[c.f]) : null });
+    }
+    if (!items.length) return null;
+    return { type:'phase', file:t.file, sheet:t.sheet, items, sum: items.reduce((s,x) => s + x.budget, 0),
+      range: t.range(r1, r2, c.b), reportedTotal: total, budgetCol: hit.raw[c.b], rowsTxt:`rows ${t.rowNo(r1)}–${t.rowNo(r2)}` };
+  }
+
+  function detectWP(t){
+    let c = null;
+    const hit = findHeaderRow(t, h => {
+      if (!h.some(x => WP_RE.test(x)) || !h.some(x => BUD_RE.test(x))) return false;
+      let wp = idx(h, WP_NAME_RE, /\b(code|id|no|number|ref)\b/); if (wp < 0) wp = idx(h, WP_RE);
+      let code = idx(h, /\b(code|id|no|number|ref)\b/, /\b(name|description|title)\b/);
+      let name = idx(h, /\b(name|description|title)\b/);
+      if (name < 0) name = wp; if (code < 0 && wp !== name) code = wp;
+      c = { code, name, b: idxPref(h, BUD_RE, /\b(budget|bac)\b/, /\b(remaining|variance)\b/),
+            e: idx(h, /\b(earned|ev|bcwp)\b/), a: idx(h, /\b(actual|actuals|ac|acwp|spent|cost to date)\b/, /\b(start|finish|date)\b/),
+            p: idx(h, /%|\bpercent\b|\bprogress\b/), f: idx(h, /\b(eac|fac|forecast)\b/), ph: idx(h, PHASE_RE) };
+      return true;
+    });
+    if (!hit) return null;
+    const items = [];
+    for (let r = hit.r + 1; r < t.rows.length; r++){
+      const row = t.rows[r] || []; const name = row[c.name];
+      if (blank(name) || isTotal(name) || (c.code >= 0 && isTotal(row[c.code]))) continue;
+      const g = i => i >= 0 ? parseNum(row[i]) : null;
+      const budget = g(c.b); if (budget == null) continue;
+      const pct = g(c.p);
+      items.push({ code: c.code >= 0 && !blank(row[c.code]) ? String(row[c.code]).trim() : '', name:String(name).trim(), row:t.rowNo(r),
+        phase: c.ph >= 0 && !blank(row[c.ph]) ? String(row[c.ph]).trim() : '', budget, ev:g(c.e), ac:g(c.a), pct, eac:g(c.f) });
+    }
+    if (!items.length) return null;
+    if (items.some(i => i.pct > 1.5)) items.forEach(i => { if (i.pct != null) i.pct /= 100; });   // column given as 0–100
+    return { type:'wp', file:t.file, sheet:t.sheet, items, hasEV:c.e >= 0, hasAC:c.a >= 0, rowsTxt:`${items.length} rows` };
+  }
+
+  const PRI_TXT = [[/^(critical|very high|urgent|extreme|top)\b/,0],[/^(high|major|red)\b/,1],[/^(medium|med|moderate|amber|normal)\b/,2],[/^(very low|negligible)\b/,4],[/^(low|minor|green)\b/,3]];
+  function detectIssues(t){
+    let c = null;
+    const hit = findHeaderRow(t, h => {
+      const word = h.some(x => /\b(issues?|risks?)\b/.test(x));
+      const pri = h.some(x => /\b(priority|severity|criticality|rating|rag|score)\b/.test(x));
+      const imp = h.some(x => /\b(impact|exposure)\b/.test(x));
+      const desc = h.some(x => /\b(title|description|subject)\b/.test(x));
+      if (!((word && (pri || imp)) || (desc && pri && !h.some(x => WP_RE.test(x) || BUD_RE.test(x))))) return false;
+      const id = idx(h, /^(id|ref|no|nr|number)$|\b(id|ref|number|no)\b/, /\b(title|description)\b/);
+      let title = idx(h, /\b(title|description|subject|summary)\b/);
+      if (title < 0) title = idx(h, /\b(issues?|risks?|name)\b/, /\b(id|ref|no|number|owner|type|status)\b/);
+      if (title < 0) return false;
+      const priCol = idx(h, /\b(priority|severity|criticality|rating|rag|score)\b/);
+      c = { id, title, pri: priCol, higherWorse: priCol >= 0 && /\b(score|rating|severity)\b/.test(h[priCol]),
+        imp: idxPref(h, /\b(impact|exposure|cost)\b/, /\b(cost|financial|exposure)\b/, /\b(schedule|time|days)\b/),
+        type: idx(h, /\b(type|category)\b/), owner: idx(h, /\b(owner|responsible|assigned|action by|action owner)\b/),
+        due: idx(h, /\b(due|deadline|target date|closure date)\b/), status: idx(h, /\b(status|state)\b/) };
+      return true;
+    });
+    if (!hit) return null;
+    const items = [];
+    for (let r = hit.r + 1; r < t.rows.length; r++){
+      const row = t.rows[r] || []; const title = row[c.title];
+      if (blank(title)) continue;
+      const v = i => i >= 0 && !blank(row[i]) ? row[i] : null;
+      const status = v(c.status) != null ? String(v(c.status)).trim() : '';
+      const open = !/^(closed|resolved|cancel|done|complete|retired|void|archived)/i.test(status);
+      const pRaw = v(c.pri); let rank = 9;
+      if (pRaw != null){
+        const n = typeof pRaw === 'number' ? pRaw : (/^\s*-?\d+(\.\d+)?\s*$/.test(String(pRaw)) ? parseFloat(pRaw) : null);
+        if (n != null) rank = c.higherWorse ? -n : n;
+        else { const p = norm(pRaw); const f = PRI_TXT.find(([re]) => re.test(p)); rank = f ? f[1] : 8; }
+      }
+      const impRaw = v(c.imp); const impNum = parseNum(impRaw);
+      items.push({ row:t.rowNo(r), id: v(c.id) != null ? String(v(c.id)).trim() : '', title:String(title).trim(),
+        type: v(c.type) != null ? String(v(c.type)).trim() : '', priority: pRaw != null ? String(pRaw).trim() : '', rank,
+        impact: impNum, impactText: impNum == null && impRaw != null ? String(impRaw).trim() : '',
+        owner: v(c.owner) != null ? String(v(c.owner)).trim() : '', due: v(c.due) != null ? fmtCellDate(v(c.due)) : '', status, open });
+    }
+    if (!items.length) return null;
+    return { type:'issues', file:t.file, sheet:t.sheet, items, hasStatus:c.status >= 0, hasImpact:c.imp >= 0,
+      impactCol: c.imp >= 0 ? hit.raw[c.imp] : null, priorityCol: c.pri >= 0 ? hit.raw[c.pri] : null, rowsTxt:`${items.length} rows` };
+  }
+
+  const DETECTORS = [['issues',detectIssues],['wp',detectWP],['phase',detectPhase],['trend',detectTrend],['kpi',detectKPI]];
+  function parseCostWorkbook(X, wb, file){
+    const found = {}, unrecognised = [], dupes = [];
+    const single = wb.SheetNames.length === 1 && /\.csv$/i.test(file || '');
+    wb.SheetNames.forEach(name => {
+      const t = sheetTable(X, wb.Sheets[name], file, name, single); if (!t) return;
+      for (const [type, fn] of DETECTORS){
+        const r = fn(t);
+        if (r){ if (!found[type]) found[type] = r; else dupes.push(`${name}: second ${type} sheet, ignored`); return; }
+      }
+      unrecognised.push(name);
+    });
+    return { found, unrecognised, dupes };
+  }
+
+  // ---------- schedules ----------
+  function parseXER(text, file){
+    const tables = {}; let cur = null, fields = null;
+    for (const line of text.split(/\r?\n/)){
+      if (line.startsWith('%T\t')){ cur = line.slice(3).trim(); tables[cur] = []; fields = null; }
+      else if (line.startsWith('%F\t')) fields = line.slice(3).split('\t');
+      else if (line.startsWith('%R\t') && cur && fields){ const v = line.slice(3).split('\t'); const o = {}; fields.forEach((f,i) => o[f] = v[i] !== undefined ? v[i] : ''); tables[cur].push(o); }
+    }
+    if (!tables.TASK || !tables.TASK.length) throw new Error(`“${file}” has no TASK table – is it a complete P6 export?`);
+    const cnt = {}; tables.TASK.forEach(t => cnt[t.proj_id] = (cnt[t.proj_id]||0) + 1);
+    const projIds = Object.keys(cnt), projId = projIds.slice().sort((a,b) => cnt[b] - cnt[a])[0];
+    const proj = (tables.PROJECT || []).find(p => p.proj_id === projId) || {};
+    const cal = {}; (tables.CALENDAR || []).forEach(c => { const h = parseFloat(c.day_hr_cnt); if (h > 0) cal[c.clndr_id] = h; });
+    const wbs = {}; (tables.PROJWBS || []).forEach(w => wbs[w.wbs_id] = w);
+    const rootW = (tables.PROJWBS || []).find(w => w.proj_id === projId && w.proj_node_flag === 'Y');
+    const topOf = id => { let w = wbs[id], prev = null, g = 0; while (w && w.proj_node_flag !== 'Y' && g++ < 60){ prev = w; w = wbs[w.parent_wbs_id]; } return prev ? (prev.wbs_name || prev.wbs_short_name) : '(project level)'; };
+    const notes = []; let excluded = 0, defaultCal = false;
+    const acts = [];
+    tables.TASK.forEach(t => {
+      if (t.proj_id !== projId) return;
+      if (/TT_LOE|TT_WBS/.test(t.task_type)){ excluded++; return; }
+      if (!cal[t.clndr_id]) defaultCal = true;
+      const hpd = cal[t.clndr_id] || 8;
+      const status = t.status_code === 'TK_Complete' ? 'complete' : t.status_code === 'TK_Active' ? 'active' : 'notstarted';
+      const aS = parseDT(t.act_start_date), aF = parseDT(t.act_end_date);
+      const tfH = parseFloat(t.total_float_hr_cnt);
+      let pct = status === 'complete' ? 100 : status === 'notstarted' ? 0 : null;
+      if (pct == null){
+        if (t.complete_pct_type === 'CP_Drtn'){ const tg = parseFloat(t.target_drtn_hr_cnt), rm = parseFloat(t.remain_drtn_hr_cnt); pct = tg > 0 && isFinite(rm) ? Math.max(0, Math.min(100, (tg - rm) / tg * 100)) : null; }
+        else { const p = parseFloat(t.phys_complete_pct); pct = isFinite(p) ? p : null; }
+      }
+      acts.push({ key:t.task_id, code:t.task_code, name:t.task_name, wbs:topOf(t.wbs_id), status,
+        pS:parseDT(t.target_start_date), pF:parseDT(t.target_end_date), aS, aF,
+        cS: aS || parseDT(t.restart_date) || parseDT(t.early_start_date), cF: aF || parseDT(t.reend_date) || parseDT(t.early_end_date),
+        tf: status !== 'complete' && isFinite(tfH) ? tfH / hpd : null, pct, durH: parseFloat(t.target_drtn_hr_cnt) || 0,
+        milestone: /TT_Mile|TT_FinMile/.test(t.task_type) });
+    });
+    const keys = new Set(acts.map(a => a.key));
+    const rels = (tables.TASKPRED || []).filter(r => keys.has(r.task_id) && keys.has(r.pred_task_id))
+      .map(r => ({ pred:r.pred_task_id, succ:r.task_id, type:(r.pred_type || 'PR_FS').replace('PR_',''), lagH:parseFloat(r.lag_hr_cnt) || 0 }));
+    if (projIds.length > 1) notes.push(`File contains ${projIds.length} projects – showing ${proj.proj_short_name || projId} (most activities)`);
+    if (excluded) notes.push(`${excluded} LOE / WBS-summary activities excluded`);
+    if (defaultCal) notes.push('Some calendars had no hours/day – 8 h/day used to convert float');
+    return { kind:'Primavera P6 (.xer)', file, name: [proj.proj_short_name, rootW && rootW.wbs_name].filter(Boolean).join(' – '),
+      dataDate: parseDT(proj.last_recalc_date), dataDateField:'PROJECT.last_recalc_date',
+      headerFinish: parseDT(proj.scd_end_date), headerFinishField:'PROJECT.scd_end_date',
+      fields:{ planned:'TASK.target_start_date / target_end_date', current:'TASK actual dates, else early start / finish', tf:'TASK.total_float_hr_cnt ÷ calendar hours per day', pct:'TASK.phys_complete_pct (duration % for CP_Drtn activities)', status:'TASK.status_code' },
+      acts, rels, notes };
+  }
+
+  const kids = (el, name) => Array.from(el.childNodes || []).filter(n => n.nodeType === 1 && (n.localName || n.nodeName) === name);
+  const txt = (el, name) => { const c = kids(el, name)[0]; return c ? c.textContent.trim() : ''; };
+
+  function parseMSPXML(doc, file){
+    const root = doc.documentElement;
+    const mpd = parseFloat(txt(root,'MinutesPerDay')) || 480;
+    const tEl = kids(root,'Tasks')[0]; const tasks = tEl ? kids(tEl,'Task') : [];
+    let top = '(top level)'; const acts = [], rels = [];
+    tasks.forEach(t => {
+      const uid = txt(t,'UID'); if (uid === '0' || txt(t,'IsNull') === '1') return;
+      const lvl = parseInt(txt(t,'OutlineLevel')) || 1, name = txt(t,'Name');
+      if (txt(t,'Summary') === '1'){ if (lvl === 1) top = name; return; }
+      const b = kids(t,'Baseline').find(x => txt(x,'Number') === '0');
+      const pct = parseFloat(txt(t,'PercentComplete')) || 0;
+      const aS = parseDT(txt(t,'ActualStart')), aF = parseDT(txt(t,'ActualFinish'));
+      const status = pct >= 100 || aF ? 'complete' : (aS || pct > 0) ? 'active' : 'notstarted';
+      const ts = txt(t,'TotalSlack');
+      const dm = txt(t,'Duration').match(/PT(\d+(?:\.\d+)?)H(\d+(?:\.\d+)?)M/);
+      acts.push({ key:uid, code: txt(t,'WBS') || txt(t,'ID'), name, wbs: lvl === 1 ? '(top level)' : top, status,
+        pS: b ? parseDT(txt(b,'Start')) : null, pF: b ? parseDT(txt(b,'Finish')) : null, aS, aF,
+        cS: aS || parseDT(txt(t,'Start')), cF: aF || parseDT(txt(t,'Finish')),
+        tf: status !== 'complete' && ts !== '' ? parseFloat(ts) / 10 / mpd : null, pct,
+        durH: dm ? +dm[1] + dm[2]/60 : 0, milestone: txt(t,'Milestone') === '1' });
+      kids(t,'PredecessorLink').forEach(l => rels.push({ pred:txt(l,'PredecessorUID'), succ:uid, type:['FF','FS','SF','SS'][parseInt(txt(l,'Type'))] || 'FS', lagH:(parseFloat(txt(l,'LinkLag')) || 0) / 600 }));
+    });
+    const keys = new Set(acts.map(a => a.key));
+    const notes = [];
+    if (acts.length && acts.every(a => !a.pF)) notes.push('No baseline saved in this file – planned dates are not available (set a baseline in MS Project, then save as XML again)');
+    return { kind:'MS Project (.xml)', file, name: txt(root,'Title') || txt(root,'Name'),
+      dataDate: parseDT(txt(root,'StatusDate')), dataDateField:'Project › StatusDate',
+      headerFinish: parseDT(txt(root,'FinishDate')), headerFinishField:'Project › FinishDate',
+      fields:{ planned:'Task › Baseline 0 Start / Finish', current:'Task › ActualStart / ActualFinish, else Start / Finish', tf:'Task › TotalSlack (tenths of minutes ÷ MinutesPerDay)', pct:'Task › PercentComplete', status:'Task › PercentComplete and ActualStart' },
+      acts, rels: rels.filter(r => keys.has(r.pred) && keys.has(r.succ)), notes };
+  }
+
+  function parseP6XML(doc, file){
+    const root = doc.documentElement;
+    const projects = kids(root,'Project');
+    if (!projects.length) throw new Error(`“${file}”: no <Project> found in this P6 XML.`);
+    const proj = projects.slice().sort((a,b) => kids(b,'Activity').length - kids(a,'Activity').length)[0];
+    const calEl = kids(root,'Calendar')[0];
+    const hpd = (calEl && parseFloat(txt(calEl,'HoursPerDay'))) || 8;
+    const wbs = {}; kids(proj,'WBS').forEach(w => wbs[txt(w,'ObjectId')] = { parent:txt(w,'ParentObjectId'), name:txt(w,'Name') || txt(w,'Code') });
+    const topOf = id => { let cur = wbs[id], prev = null, g = 0; while (cur && g++ < 60){ prev = cur; cur = wbs[cur.parent]; } return prev ? prev.name : '(project level)'; };
+    const raw = kids(proj,'Activity'); let excluded = 0;
+    const pcts = raw.map(a => parseFloat(txt(a,'PercentComplete'))).filter(isFinite);
+    const scale = pcts.length && Math.max(...pcts) <= 1 ? 100 : 1;
+    const acts = [];
+    raw.forEach(a => {
+      const type = txt(a,'Type');
+      if (/Level of Effort|WBS Summary/i.test(type)){ excluded++; return; }
+      const st = txt(a,'Status');
+      const status = /complet/i.test(st) ? 'complete' : /progress/i.test(st) ? 'active' : 'notstarted';
+      const aS = parseDT(txt(a,'ActualStartDate')), aF = parseDT(txt(a,'ActualFinishDate'));
+      const tfH = parseFloat(txt(a,'TotalFloat')); const p = parseFloat(txt(a,'PercentComplete'));
+      acts.push({ key:txt(a,'ObjectId'), code:txt(a,'Id'), name:txt(a,'Name'), wbs:topOf(txt(a,'WBSObjectId')), status,
+        pS:parseDT(txt(a,'PlannedStartDate')), pF:parseDT(txt(a,'PlannedFinishDate')), aS, aF,
+        cS: aS || parseDT(txt(a,'StartDate')), cF: aF || parseDT(txt(a,'FinishDate')),
+        tf: status !== 'complete' && isFinite(tfH) ? tfH / hpd : null,
+        pct: status === 'complete' ? 100 : isFinite(p) ? p * scale : (status === 'notstarted' ? 0 : null),
+        durH: parseFloat(txt(a,'PlannedDuration')) || 0, milestone: /Milestone/i.test(type) });
+    });
+    const keys = new Set(acts.map(a => a.key));
+    let relEls = kids(proj,'Relationship'); if (!relEls.length) relEls = kids(root,'Relationship');
+    const T = { 'Finish to Start':'FS', 'Start to Start':'SS', 'Finish to Finish':'FF', 'Start to Finish':'SF' };
+    const rels = relEls.map(r => ({ pred:txt(r,'PredecessorActivityObjectId'), succ:txt(r,'SuccessorActivityObjectId'), type:T[txt(r,'Type')] || 'FS', lagH:parseFloat(txt(r,'Lag')) || 0 }))
+      .filter(r => keys.has(r.pred) && keys.has(r.succ));
+    const notes = []; if (excluded) notes.push(`${excluded} LOE / WBS-summary activities excluded`);
+    if (!calEl) notes.push('No calendar in file – 8 h/day used to convert float');
+    return { kind:'Primavera P6 (.xml)', file, name: [txt(proj,'Id'), txt(proj,'Name')].filter(Boolean).join(' – '),
+      dataDate: parseDT(txt(proj,'DataDate')), dataDateField:'Project › DataDate',
+      headerFinish: parseDT(txt(proj,'ScheduledFinishDate') || txt(proj,'FinishDate')), headerFinishField:'Project › ScheduledFinishDate',
+      fields:{ planned:'Activity › PlannedStartDate / PlannedFinishDate', current:'Activity › actual dates, else StartDate / FinishDate', tf:'Activity › TotalFloat ÷ hours per day', pct:'Activity › PercentComplete', status:'Activity › Status' },
+      acts, rels, notes };
+  }
+
+  function parseScheduleText(text, file, DOMParserImpl){
+    if (/\.xer$/i.test(file) || /^ERMHDR/.test(text)) return parseXER(text, file);
+    const doc = new DOMParserImpl().parseFromString(text, 'application/xml');
+    if (!doc || !doc.documentElement || doc.getElementsByTagName('parsererror').length) throw new Error(`“${file}” is not valid XML.`);
+    const rn = doc.documentElement.localName || doc.documentElement.nodeName;
+    if (rn === 'APIBusinessObjects') return parseP6XML(doc, file);
+    if (rn === 'Project') return parseMSPXML(doc, file);
+    throw new Error(`“${file}” is XML, but not an MS Project or Primavera P6 schedule (root element <${rn}>).`);
+  }
+
+  // ---------- calculations ----------
+  const NEED = {
+    ev: "EV – an 'EV' / 'Earned Value' row in the KPI summary sheet (Metric | Value), or an 'Earned cumulative' column in the monthly trend sheet",
+    pv: "PV – a 'PV' / 'Planned Value' row in the KPI summary sheet, or a 'Planned cumulative' column in the monthly trend sheet",
+    ac: "AC – an 'AC' / 'Actual Cost' row in the KPI summary sheet, or an 'Actual cumulative' column in the monthly trend sheet",
+    bac: "BAC – a 'BAC' row in the KPI summary sheet, or a phase / CBS sheet with a 'Budget' column",
+  };
+
+  function computeCost(cost){
+    const k = cost.kpi ? cost.kpi.items : {};
+    const tr = cost.trend || null;
+    let dd = null;
+    if (tr) for (let i = tr.rows.length - 1; i >= 0; i--) if (tr.rows[i].ac != null){ dd = tr.rows[i]; break; }
+    const fromK = key => { const it = k[key]; if (!it) return null; const n = parseNum(it.raw); return n == null ? null : { v:n, ref:it.ref, label:it.label }; };
+    const fromT = key => (dd && dd[key] != null) ? { v:dd[key], ref:`${dd.refs[key]} (${dd.label})`, label:tr.colNames[key], fromTrend:true } : null;
+    let bac = fromK('bac');
+    if (!bac && cost.phase) bac = { v:cost.phase.sum, ref:`SUM(${cost.phase.range})`, label:'Sum of phase budgets', calc:true };
+    const pv = fromK('pv') || fromT('pv'), ev = fromK('ev') || fromT('ev'), ac = fromK('ac') || fromT('ac');
+    const spiRep = fromK('spi') || fromT('spi'), cpiRep = fromK('cpi') || fromT('cpi');
+    const eacRep = fromK('eac'); const pctRep = fromK('pct'); if (pctRep && pctRep.v > 1.5) pctRep.v /= 100;
+    const div = (a,b) => (a && b && b.v) ? a.v / b.v : null;
+    const spi = div(ev,pv), cpi = div(ev,ac), progress = div(ev,bac), used = div(ac,bac);
+    const sv = ev && pv ? ev.v - pv.v : null, cv = ev && ac ? ev.v - ac.v : null;
+    const eac = bac && cpi ? bac.v / cpi : null, vac = eac != null ? bac.v - eac : null;
+    let currency = '';
+    if (k.currency && !blank(k.currency.raw)) currency = detectCurrency(k.currency.raw) || String(k.currency.raw).trim() + ' ';
+    else if (cost.kpi) currency = cost.kpi.currencyHint || '';
+    const name = k.name && !blank(k.name.raw) ? { v:String(k.name.raw).trim(), ref:k.name.ref } : null;
+    let dataDate = null;
+    if (k.dataDate && !blank(k.dataDate.raw)) dataDate = { d:cellDate(k.dataDate.raw), text:fmtCellDate(k.dataDate.raw), ref:k.dataDate.ref };
+    else if (dd) dataDate = { d:null, text:dd.label, ref:dd.refs.month, fromTrend:true };
+    return { bac, pv, ev, ac, spiRep, cpiRep, eacRep, pctRep, spi, cpi, progress, used, sv, cv, eac, vac, currency, name, dataDate, trendDate: dd ? dd.date : null };
+  }
+
+  function computeSchedule(s, nearDays){
+    const acts = s.acts;
+    const counts = { complete:0, active:0, notstarted:0, total:acts.length };
+    acts.forEach(a => counts[a.status]++);
+    const maxBy = f => acts.reduce((m,a) => f(a) && (!m || f(a) > f(m)) ? a : m, null);
+    const pAct = maxBy(a => a.pF), cAct = maxBy(a => a.cF);
+    const plannedFinish = pAct ? pAct.pF : null, forecastFinish = cAct ? cAct.cF : null;
+    const slip = plannedFinish && forecastFinish ? dayDiff(plannedFinish, forecastFinish) : null;
+    const open = acts.filter(a => a.status !== 'complete');
+    const withTF = open.filter(a => a.tf != null);
+    const crit = withTF.filter(a => a.tf <= 0), neg = withTF.filter(a => a.tf < 0), near = withTF.filter(a => a.tf > 0 && a.tf <= nearDays);
+    const w = acts.filter(a => !a.milestone && a.durH > 0 && a.pct != null);
+    let pct = null, pctMethod = '';
+    if (w.length){ const sw = w.reduce((s,a) => s + a.durH, 0); pct = w.reduce((s,a) => s + a.pct * a.durH, 0) / sw / 100; pctMethod = 'Σ(% complete × planned duration) ÷ Σ planned duration, milestones excluded'; }
+    else { const p = acts.filter(a => !a.milestone && a.pct != null); if (p.length){ pct = p.reduce((s,a) => s + a.pct, 0) / p.length / 100; pctMethod = 'simple average of activity % complete (no durations in file)'; } }
+    const wbsMap = new Map();
+    acts.slice().sort((a,b) => ((a.pS || a.cS || 0) - (b.pS || b.cS || 0))).forEach(a => {
+      if (!wbsMap.has(a.wbs)) wbsMap.set(a.wbs, { name:a.wbs, complete:0, active:0, notstarted:0 });
+      wbsMap.get(a.wbs)[a.status]++;
+    });
+    return { counts, plannedFinish, forecastFinish, pAct, cAct, slip, open, crit, neg, near, withTF:withTF.length, pct, pctMethod, byWbs:[...wbsMap.values()] };
+  }
+
+  // ---------- data quality checks ----------
+  function qualityChecks(cost, cc, sched, sc){
+    const out = [], M = v => fmtMoney(v, cc.currency);
+    const add = (title, o) => out.push(Object.assign({ title, items:[] }, o));
+    const tr = cost.trend;
+    const noSched = 'a schedule file (.xer or .xml)';
+
+    { // 1 reported vs calculated
+      const items = []; let ran = false;
+      if (cc.spi != null && cc.spiRep){ ran = true; if (Math.abs(cc.spi - cc.spiRep.v) > TOL_IDX) items.push(`SPI reported ${r2(cc.spiRep.v)} (${cc.spiRep.ref}) but EV ÷ PV = ${r2(cc.spi)}`); }
+      if (cc.cpi != null && cc.cpiRep){ ran = true; if (Math.abs(cc.cpi - cc.cpiRep.v) > TOL_IDX) items.push(`CPI reported ${r2(cc.cpiRep.v)} (${cc.cpiRep.ref}) but EV ÷ AC = ${r2(cc.cpi)}`); }
+      if (tr && tr.hasEV) tr.rows.forEach(r => {
+        if (r.ev != null && r.pv && r.spi != null){ ran = true; const c = r.ev / r.pv; if (Math.abs(c - r.spi) > TOL_IDX) items.push(`Trend ${r.label} (row ${r.row}): SPI reported ${r2(r.spi)}, EV ÷ PV = ${r2(c)}`); }
+        if (r.ev != null && r.ac && r.cpi != null){ ran = true; const c = r.ev / r.ac; if (Math.abs(c - r.cpi) > TOL_IDX) items.push(`Trend ${r.label} (row ${r.row}): CPI reported ${r2(r.cpi)}, EV ÷ AC = ${r2(c)}`); }
+      });
+      add('Reported SPI / CPI match EV ÷ PV and EV ÷ AC', !ran ? { status:'na', need:'a reported SPI or CPI (KPI summary or trend sheet) together with EV, PV and AC' }
+        : items.length ? { status:'warn', msg:`${items.length} difference(s) larger than ±0.005`, items } : { status:'ok', msg:'All reported indices agree with the calculation (±0.005)' });
+    }
+    { // 2 SPI×PV vs CPI×AC
+      const items = []; let n = 0;
+      if (tr && tr.hasSPI && tr.hasCPI) tr.rows.forEach(r => {
+        if (r.spi == null || r.cpi == null || r.pv == null || r.ac == null) return;
+        n++;
+        const e1 = r.spi * r.pv, e2 = r.cpi * r.ac, tol = TOL_IDX * (r.pv + r.ac);
+        if (Math.abs(e1 - e2) > tol) items.push(`${r.label} (row ${r.row}): SPI × PV = ${M(e1)} but CPI × AC = ${M(e2)} (gap ${M(e1 - e2)})`);
+      });
+      add('Trend: SPI × PV gives the same EV as CPI × AC', !n ? { status:'na', need:"a monthly trend sheet with 'SPI', 'CPI', 'Planned cumulative' and 'Actual cumulative' columns" }
+        : items.length ? { status:'warn', msg:`${items.length} of ${n} months imply two different EVs (tolerance allows for 2-decimal rounding of SPI and CPI)`, items } : { status:'ok', msg:`${n} months checked – consistent within rounding` });
+    }
+    { // 3 EV copied from AC
+      const items = []; let ran = false;
+      if (cc.ev && cc.ac){ ran = true; if (cc.ac.v > 0 && Math.abs(cc.ev.v - cc.ac.v) < 0.5) items.push(`EV (${cc.ev.ref}) equals AC (${cc.ac.ref}) = ${M(cc.ac.v)}`); }
+      if (tr && tr.hasEV){ ran = true; const same = tr.rows.filter(r => r.ev != null && r.ac > 0 && Math.abs(r.ev - r.ac) < 0.5); if (same.length) items.push(`Trend: Earned = Actual in ${same.length} month(s): ${same.map(r => `${r.label} (row ${r.row})`).join(', ')}`); }
+      if (cost.wp && cost.wp.hasEV && cost.wp.hasAC){ ran = true; cost.wp.items.forEach(w => { if (w.ev != null && w.ac > 0 && Math.abs(w.ev - w.ac) < 0.5) items.push(`Work package ${w.code || w.name} (${cost.wp.sheet}, row ${w.row}): EV = AC = ${M(w.ac)}`); }); }
+      add('Earned value is not a copy of actual cost', !ran ? { status:'na', need:'EV and AC values (KPI summary, trend or work-package sheet)' }
+        : items.length ? { status:'warn', msg:'Identical EV and AC usually means actuals were pasted in as progress', items } : { status:'ok', msg:'No EV value equals its AC' });
+    }
+    { // 4 EAC vs BAC ÷ CPI
+      if (cc.eacRep && cc.eac != null){
+        const d = (cc.eacRep.v - cc.eac) / cc.eac;
+        add('Forecast at completion matches BAC ÷ CPI', Math.abs(d) > 0.01
+          ? { status:'warn', msg:`Reported ${M(cc.eacRep.v)} (${cc.eacRep.ref}) vs BAC ÷ CPI = ${M(cc.eac)} (${d > 0 ? '+' : ''}${(d*100).toFixed(1)}%). Expected if the forecast is bottom-up – confirm the method.` }
+          : { status:'ok', msg:`Reported ${M(cc.eacRep.v)} is within 1% of BAC ÷ CPI` });
+      } else add('Forecast at completion matches BAC ÷ CPI', { status:'na', need:"an 'EAC' / 'FAC' row in the KPI summary sheet, plus BAC, EV and AC" });
+    }
+    { // 5 in-progress finishing before data date
+      if (sched && sched.dataDate){
+        const items = sc.open.filter(a => a.status === 'active' && a.cF && dayOnly(a.cF) < dayOnly(sched.dataDate)).map(a => `${a.code} ${a.name}: current finish ${fmtD(a.cF)}, data date ${fmtD(sched.dataDate)}`);
+        add('In-progress activities finish on or after the data date', items.length ? { status:'warn', msg:`${items.length} in-progress activit${items.length > 1 ? 'ies have' : 'y has'} a finish date in the past – update progress or reschedule`, items } : { status:'ok', msg:`${sc.counts.active} in-progress activities checked` });
+      } else add('In-progress activities finish on or after the data date', { status:'na', need: sched ? `a data date in the schedule (${sched.dataDateField})` : noSched });
+    }
+    { // 6 logic
+      if (sched && sched.rels.length){
+        const by = new Map(sched.acts.map(a => [a.key, a])); const items = [];
+        sched.rels.forEach(r => {
+          const p = by.get(r.pred), s = by.get(r.succ); if (!p || !s) return;
+          const sS = s.aS || s.cS, pF = p.aF || p.cF, pS = p.aS || p.cS;
+          const act = s.aS ? ' (actual)' : '';
+          if (r.type === 'FS' && sS && pF && dayOnly(sS) < dayOnly(pF)) items.push(`${s.code} ${s.name} starts ${fmtD(sS)}${act} before predecessor ${p.code} finishes ${fmtD(pF)} (FS)`);
+          if (r.type === 'SS' && sS && pS && dayOnly(sS) < dayOnly(pS)) items.push(`${s.code} ${s.name} starts ${fmtD(sS)}${act} before predecessor ${p.code} starts ${fmtD(pS)} (SS)`);
+        });
+        add('Activities start after their predecessors (FS / SS logic)', items.length ? { status:'warn', msg:`${items.length} relationship(s) out of sequence. Lags are ignored, so only clear violations are listed.`, items } : { status:'ok', msg:`${sched.rels.length} relationships checked` });
+      } else add('Activities start after their predecessors (FS / SS logic)', { status:'na', need: sched ? 'relationships in the schedule (TASKPRED / PredecessorLink / Relationship)' : noSched });
+    }
+    { // 7 header finish
+      if (sched && sched.headerFinish && sc.forecastFinish){
+        const d = dayDiff(sched.headerFinish, sc.forecastFinish);
+        add('Project finish in the file header matches the latest activity finish', d !== 0
+          ? { status:'warn', msg:`Header ${sched.headerFinishField} = ${fmtD(sched.headerFinish)}, latest activity finish = ${fmtD(sc.forecastFinish)} (${sc.cAct.code}), ${Math.abs(d)} day(s) apart. The schedule may not have been recalculated before export.` }
+          : { status:'ok', msg:`Both ${fmtD(sc.forecastFinish)}` });
+      } else add('Project finish in the file header matches the latest activity finish', { status:'na', need: sched ? `a project finish in the schedule header (${sched.headerFinishField})` : noSched });
+    }
+    { // 8 % complete
+      const wpItems = [];
+      if (sched && cost.wp){
+        const byCode = new Map(sched.acts.map(a => [String(a.code).trim().toUpperCase(), a]));
+        cost.wp.items.forEach(w => { const a = w.code && byCode.get(w.code.toUpperCase());
+          if (a && a.pct != null && w.pct != null && Math.abs(w.pct * 100 - a.pct) > 2) wpItems.push(`${w.code} ${w.name}: cost report ${(w.pct * 100).toFixed(0)}% (${cost.wp.sheet}, row ${w.row}) vs schedule ${a.pct.toFixed(0)}%`); });
+      }
+      if (sc && sc.pct != null && (cc.progress != null || cc.pctRep || (cost.wp && cost.wp.items.some(w => w.pct != null)))){
+        const items = wpItems.slice();
+        if (cc.progress != null){ const d = sc.pct - cc.progress; if (Math.abs(d) > 0.05) items.push(`Schedule ${(sc.pct*100).toFixed(1)}% (duration-weighted) vs cost report EV ÷ BAC ${(cc.progress*100).toFixed(1)}% – ${Math.abs(d*100).toFixed(1)} pts apart`); }
+        if (cc.pctRep){ const d = sc.pct - cc.pctRep.v; if (Math.abs(d) > 0.05) items.push(`Schedule ${(sc.pct*100).toFixed(1)}% vs % complete in ${cc.pctRep.ref}: ${(cc.pctRep.v*100).toFixed(1)}%`); }
+        add('% complete agrees between schedule and cost report', items.length ? { status:'warn', msg: wpItems.length && items.length === wpItems.length ? 'A work package shows different progress in the cost report and the schedule (more than 2 points). One side may be using an older measurement.' : 'More than 5 points apart overall, or more than 2 points on a work package. Some gap is normal (the schedule is duration-weighted, cost is budget-weighted); a large one usually means one side was not updated.', items } : { status:'ok', msg:'Within 5 percentage points overall' + (cost.wp && sched ? ', and within 2 points per work package' : '') });
+      } else add('% complete agrees between schedule and cost report', { status:'na', need: !sc ? 'a schedule file with activity % complete' : 'EV and BAC (or a % complete row) in the cost report' });
+    }
+    { // 9 extra: data dates
+      if (sched && sched.dataDate && cc.dataDate && cc.dataDate.d){
+        const d = dayDiff(cc.dataDate.d, sched.dataDate);
+        add('Cost report and schedule have the same data date (extra)', Math.abs(d) > 3 ? { status:'warn', msg:`Cost ${fmtD(cc.dataDate.d)} (${cc.dataDate.ref}) vs schedule ${fmtD(sched.dataDate)} – ${Math.abs(d)} days apart` } : { status:'ok', msg:`Within 3 days (cost ${fmtD(cc.dataDate.d)}, schedule ${fmtD(sched.dataDate)})` });
+      } else add('Cost report and schedule have the same data date (extra)', { status:'na', need:'a data date in both the KPI summary and the schedule' });
+    }
+    { // 10 extra: phase total
+      if (cost.phase && ((cc.bac && !cc.bac.calc) || cost.phase.reportedTotal)){
+        const items = [];
+        if (cc.bac && !cc.bac.calc && Math.abs(cost.phase.sum - cc.bac.v) > 0.01 * cc.bac.v) items.push(`Sum of phase budgets ${M(cost.phase.sum)} vs BAC ${M(cc.bac.v)} (${cc.bac.ref})`);
+        if (cost.phase.reportedTotal && Math.abs(cost.phase.reportedTotal.v - cost.phase.sum) > 0.5) items.push(`Total row ${cost.phase.reportedTotal.ref} = ${M(cost.phase.reportedTotal.v)} but the rows add up to ${M(cost.phase.sum)}`);
+        add('Phase budgets add up to BAC (extra)', items.length ? { status:'warn', msg:'The phase breakdown does not reconcile', items } : { status:'ok', msg:'Phase budgets reconcile with BAC (±1%)' });
+      } else add('Phase budgets add up to BAC (extra)', { status:'na', need:'a phase / CBS sheet and a BAC in the KPI summary' });
+    }
+    return out;
+  }
+
+  // ---------- sample data (fictional EPC project, with deliberate errors for the quality panel) ----------
+  function sampleCostWorkbook(X, cutIn){
+    const BAC = 48500000, N = 30, cut = cutIn || 21, latest = cut === 21;
+    const smooth = x => x*x*(3-2*x);
+    const trend = [['Month','Planned Cumulative','Earned Cumulative','Actual Cumulative','SPI','CPI']];
+    let last;
+    for (let i = 1; i <= N; i++){
+      const d = new Date(Date.UTC(2025, i, 0));
+      const pv = Math.round(BAC * smooth(i / N));
+      if (i <= cut){
+        const f = i / 21;   // fixed curve, so earlier months are not restated in later reports
+        const spi = 1.01 - 0.07 * f + 0.008 * Math.sin(i), cpi = 1.03 - 0.15 * f + 0.01 * Math.cos(i);
+        const ev = Math.round(pv * spi), ac = Math.round(ev / cpi);
+        let cpiRep = +(ev/ac).toFixed(2);
+        if (i === 15) cpiRep = +(cpiRep + 0.07).toFixed(2);            // deliberate reporting error
+        trend.push([d, pv, ev, ac, +(ev/pv).toFixed(2), cpiRep]);
+        last = { d, pv, ev, ac };
+      } else trend.push([d, pv, null, null, null, null]);
+    }
+    const kpi = [['Metric','Value'],['Project name','North Ridge 132 kV Substation EPC'],['Data date', last.d],['Currency','EUR'],
+      ['BAC', BAC],['PV', last.pv],['EV', last.ev],['AC', last.ac]].concat(latest ? [['SPI', 0.97],['CPI', 0.87],['EAC', 52400000]] : [['SPI', +(last.ev/last.pv).toFixed(2)],['CPI', +(last.ev/last.ac).toFixed(2)]]);
+    const phases = [['Phase','Budget','Actual cost to date'],['Engineering',6200000,6480000],['Procurement',21800000,18900000],['Construction',15100000,12300000],['Commissioning',2900000,0],['Project management',2500000,0],['Total',48500000,null]];
+    { let rest = last.ac; [0.1574,0.4592,0.2988,0].forEach((f,i) => { const v = Math.round(last.ac * f); phases[i+1][2] = v; rest -= v; }); phases[5][2] = rest; phases[6][2] = last.ac; }
+    const wps = [['WP Code','Work Package','Phase','Budget','Earned Value','Actual Cost'],
+      ['WP-E01','Basic & detailed design','Engineering',4100000,4100000,4350000],['WP-E02','Protection & control design','Engineering',2100000,1785000,2130000],
+      ['WP-P01','Power transformers','Procurement',11400000,9120000,9800000],['WP-P02','HV switchgear','Procurement',6300000,6300000,6050000],
+      ['WP-P03','Panels, cables & steel','Procurement',4100000,3690000,3690000],['WP-C01','Civil & foundations','Construction',5600000,5600000,6420000],
+      ['WP-C02','Control building','Construction',3300000,2310000,2900000],['WP-C03','Electrical installation','Construction',6200000,1550000,1980000],
+      ['WP-K01','Testing & commissioning','Commissioning',2900000,0,0],['WP-M01','Project management','Project management',2500000,1550000,1850000]];
+    const D = s => new Date(s + 'T12:00:00Z');
+    const issues = [['ID','Type','Title','Priority','Cost impact','Owner','Due date','Status'],
+      ['I-014','Issue','Transformer factory acceptance test delayed 6 weeks','High',1250000,'Procurement lead',D('2026-10-15'),'Open'],
+      ['R-007','Risk','Copper price increase on cable package','High',640000,'Commercial manager',D('2026-11-30'),'Open'],
+      ['I-019','Issue','Foundation redesign after soil investigation','Critical',820000,'Civil lead',D('2026-10-09'),'In progress'],
+      ['R-011','Risk','Grid operator outage window may move','Medium',410000,'Project manager',D('2026-12-15'),'Open'],
+      ['I-021','Issue','Protection settings study not approved','Medium',95000,'E&I lead',D('2026-10-20'),'Open'],
+      ['I-008','Issue','Late steel delivery','High',300000,'Procurement lead',D('2026-03-31'),'Closed'],
+      ['R-015','Risk','Commissioning team availability in summer 2027','Low',120000,'Commissioning manager',D('2027-03-31'),'Open'],
+      ['I-023','Issue','Control building HVAC specification change','Medium',210000,'Construction manager',D('2026-11-06'),'Open'],
+      ['R-002','Risk','Weather delays to earthworks','Low',150000,'Construction manager',D('2026-02-28'),'Closed']];
+    const wb = X.utils.book_new();
+    const add = (aoa, name, cols) => { const ws = X.utils.aoa_to_sheet(aoa, { cellDates:true }); ws['!cols'] = cols.map(w => ({ wch:w })); X.utils.book_append_sheet(wb, ws, name); };
+    add(kpi, 'KPI Summary', [22,38]);
+    add(trend, 'Monthly Trend', [12,20,20,20,8,8]);
+    add(phases, 'Budget by Phase', [22,16,20]);
+    add(wps, 'Work Packages', [10,30,20,14,14,14]);
+    add(issues, 'Issues & Risks', [8,8,50,10,14,24,12,12]);
+    return wb;
+  }
+
+  function sampleXER(){
+    // [code, name, wbs, milestone, pS, pF, aS, aF, cS, cF, status, pct, tfDays, preds]
+    const A = [
+      ['E1000','Project kick-off','E',1,'2025-01-06','2025-01-06','2025-01-06','2025-01-06',null,null,'C',100,null,[]],
+      ['E1010','Basic design','E',0,'2025-01-06','2025-04-30','2025-01-06','2025-05-16',null,null,'C',100,null,[['E1000','FS']]],
+      ['E1020','Detailed design – civil','E',0,'2025-05-01','2025-09-30','2025-05-19','2025-10-24',null,null,'C',100,null,[['E1010','FS']]],
+      ['E1030','Detailed design – electrical','E',0,'2025-05-01','2025-11-28','2025-05-19','2026-01-16',null,null,'C',100,null,[['E1010','FS']]],
+      ['E1040','Protection & control design','E',0,'2025-09-01','2026-02-27','2025-10-06',null,null,'2026-10-30','A',85,-8,[['E1030','SS']]],
+      ['E1050','As-built documentation','E',0,'2027-04-01','2027-06-18',null,null,'2027-06-01','2027-08-06','N',0,5,[['K4000','SS']]],
+      ['P2000','Power transformers – manufacture & delivery','P',0,'2025-06-02','2026-08-28','2025-06-16',null,null,'2026-11-27','A',80,-31,[['E1010','FS']]],
+      ['P2010','HV switchgear supply','P',0,'2025-07-01','2026-05-29','2025-07-01','2026-06-19',null,null,'C',100,null,[['E1030','SS']]],
+      ['P2020','Protection panels supply','P',0,'2025-12-01','2026-07-31','2026-01-12',null,null,'2026-09-18','A',95,4,[['E1040','SS']]],
+      ['P2030','Cables & accessories supply','P',0,'2025-10-01','2026-04-30','2025-10-01','2026-05-15',null,null,'C',100,null,[['E1030','SS']]],
+      ['P2040','Steel structures supply','P',0,'2025-08-01','2026-01-30','2025-08-04','2026-02-13',null,null,'C',100,null,[['E1020','SS']]],
+      ['C3000','Site mobilisation','C',1,'2025-09-01','2025-09-01','2025-09-15','2025-09-15',null,null,'C',100,null,[['E1000','FS']]],
+      ['C3010','Earthworks & grading','C',0,'2025-09-01','2025-12-19','2025-09-15','2026-01-23',null,null,'C',100,null,[['C3000','FS']]],
+      ['C3020','Foundations','C',0,'2025-11-03','2026-04-30','2025-12-01','2026-06-12',null,null,'C',100,null,[['C3010','FS'],['E1020','FS']]],
+      ['C3030','Control building','C',0,'2026-02-02','2026-08-28','2026-03-02',null,null,'2026-11-13','A',70,12,[['C3010','FS']]],
+      ['C3040','Steel structure erection','C',0,'2026-03-02','2026-07-31','2026-06-15',null,null,'2026-10-23','A',75,-6,[['C3020','FS'],['P2040','FS']]],
+      ['C3050','Transformer installation','C',0,'2026-09-01','2026-11-27',null,null,'2026-11-30','2027-02-26','N',0,-31,[['P2000','FS'],['C3020','FS']]],
+      ['C3060','Switchgear installation','C',0,'2026-07-01','2026-10-30','2026-07-06',null,null,'2026-12-11','A',40,-10,[['P2010','FS'],['C3040','SS']]],
+      ['C3070','Cabling & terminations','C',0,'2026-10-01','2027-02-26',null,null,'2026-11-02','2027-04-09','N',0,-31,[['P2030','FS'],['C3060','SS']]],
+      ['C3080','Earthing & lighting','C',0,'2026-08-03','2026-12-18','2026-08-17',null,null,'2027-01-29','A',35,14,[['C3010','FS']]],
+      ['K4000','Pre-commissioning tests','K',0,'2027-01-04','2027-03-26',null,null,'2027-04-12','2027-06-18','N',0,-31,[['C3070','FS'],['C3050','FS'],['P2020','FS']]],
+      ['K4010','Energisation','K',1,'2027-04-30','2027-04-30',null,null,'2027-06-21','2027-06-21','N',0,-31,[['K4000','FS']]],
+      ['K4020','Hot commissioning & trial run','K',0,'2027-05-03','2027-06-18',null,null,'2027-06-21','2027-08-13','N',0,-31,[['K4010','FS']]],
+      ['K4030','Handover to client','K',1,'2027-06-30','2027-06-30',null,null,'2027-08-16','2027-08-16','N',0,-31,[['K4020','FS']]],
+    ];
+    const W = { E:[101,'Engineering'], P:[102,'Procurement'], C:[103,'Construction'], K:[104,'Commissioning'] };
+    const st = d => d ? d + ' 08:00' : '', fn = (d,ms) => d ? d + (ms ? ' 08:00' : ' 17:00') : '';
+    const wd = (a,b) => { let n = 0; for (let d = new Date(a+'T12:00:00'); d <= new Date(b+'T12:00:00'); d.setDate(d.getDate()+1)) if (d.getDay() % 6) n++; return n; };
+    const L = ['ERMHDR\t20.12\t2026-10-01\tProject\tadmin\tSample\tdbxDatabaseNoName\tProject Management\tEUR'];
+    const table = (name, f, rows) => { L.push('%T\t' + name, '%F\t' + f.join('\t')); rows.forEach(r => L.push('%R\t' + f.map(k => r[k] == null ? '' : r[k]).join('\t'))); };
+    table('CALENDAR', ['clndr_id','clndr_name','day_hr_cnt'], [{ clndr_id:1, clndr_name:'Standard 5d x 8h', day_hr_cnt:8 }]);
+    table('PROJECT', ['proj_id','proj_short_name','plan_start_date','last_recalc_date','scd_end_date'], [{ proj_id:1001, proj_short_name:'NR-132', plan_start_date:'2025-01-06 08:00', last_recalc_date:'2026-10-01 08:00', scd_end_date:'2027-08-06 17:00' }]);
+    table('PROJWBS', ['wbs_id','proj_id','parent_wbs_id','proj_node_flag','wbs_short_name','wbs_name'],
+      [{ wbs_id:100, proj_id:1001, parent_wbs_id:'', proj_node_flag:'Y', wbs_short_name:'NR-132', wbs_name:'North Ridge 132 kV Substation EPC' }]
+      .concat(Object.values(W).map(([id,n]) => ({ wbs_id:id, proj_id:1001, parent_wbs_id:100, proj_node_flag:'N', wbs_short_name:n.slice(0,3).toUpperCase(), wbs_name:n }))));
+    const id = {}; A.forEach((a,i) => id[a[0]] = 5000 + i);
+    table('TASK', ['task_id','proj_id','wbs_id','clndr_id','task_code','task_name','task_type','status_code','complete_pct_type','phys_complete_pct','target_drtn_hr_cnt','remain_drtn_hr_cnt','total_float_hr_cnt','target_start_date','target_end_date','act_start_date','act_end_date','early_start_date','early_end_date'],
+      A.map(a => { const [code,name,w,ms,pS,pF,aS,aF,cS,cF,s,pct,tf] = a; const dur = ms ? 0 : wd(pS,pF) * 8;
+        return { task_id:id[code], proj_id:1001, wbs_id:W[w][0], clndr_id:1, task_code:code, task_name:name, task_type: ms ? 'TT_FinMile' : 'TT_Task',
+          status_code: s === 'C' ? 'TK_Complete' : s === 'A' ? 'TK_Active' : 'TK_NotStart', complete_pct_type:'CP_Phys', phys_complete_pct:pct,
+          target_drtn_hr_cnt:dur, remain_drtn_hr_cnt: s === 'C' ? 0 : Math.round(dur * (1 - pct/100)), total_float_hr_cnt: tf == null ? '' : tf * 8,
+          target_start_date:st(pS), target_end_date:fn(pF,ms), act_start_date:st(aS), act_end_date:fn(aF,ms),
+          early_start_date: s === 'C' ? '' : st(s === 'A' ? '2026-10-01' : cS), early_end_date: s === 'C' ? '' : fn(cF,ms) }; }));
+    let k = 9000; const rels = [];
+    A.forEach(a => a[13].forEach(([p,t]) => rels.push({ task_pred_id:k++, task_id:id[a[0]], pred_task_id:id[p], proj_id:1001, pred_proj_id:1001, pred_type:'PR_' + t, lag_hr_cnt:0 })));
+    table('TASKPRED', ['task_pred_id','task_id','pred_task_id','proj_id','pred_proj_id','pred_type','lag_hr_cnt'], rels);
+    L.push('%E');
+    return L.join('\r\n');
+  }
+
+  // ---------- monthly tracking helpers ----------
+  const ymKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+  function monthName(key){ const [y,m] = String(key).split('-'); return `${MON[+m - 1]} ${y}`; }
+  function monthEnd(key){ const [y,m] = String(key).split('-').map(Number); return new Date(y, m, 0, 12); }
+
+  // Which reporting month does this upload belong to?
+  function reportingMonth(cc, sched){
+    if (cc.dataDate && cc.dataDate.d) return { key:ymKey(cc.dataDate.d), src:`cost report data date ${fmtD(cc.dataDate.d)} (${cc.dataDate.ref})` };
+    if (sched && sched.dataDate){
+      const d = sched.dataDate, first = d.getDate() === 1;
+      const m = first ? new Date(d.getFullYear(), d.getMonth() - 1, 15) : d;
+      return { key:ymKey(m), src:`schedule data date ${fmtD(d)} (${sched.dataDateField})${first ? ' – a data date on the 1st counts as the end of the previous month' : ''}` };
+    }
+    if (cc.trendDate) return { key:ymKey(cc.trendDate), src:`last month with actual cost in the trend sheet (${cc.dataDate.ref})` };
+    return null;
+  }
+
+  // Compact KPI snapshot of one month (stored in the month index; drives lifecycle, comparison and CSV)
+  function snapshot(cost, cc, sched, sc){
+    const v = o => o ? o.v : null;
+    let projectStart = null;
+    if (sched){ sched.acts.forEach(a => { const d = a.pS || a.aS || a.cS; if (d && (!projectStart || d < projectStart)) projectStart = d; }); }
+    else if (cost.trend && cost.trend.rows[0].date) projectStart = cost.trend.rows[0].date;
+    let openIssues = null, openImpact = null;
+    if (cost.issues){ const o = cost.issues.items.filter(i => i.open); openIssues = o.length; if (cost.issues.hasImpact) openImpact = o.reduce((s,i) => s + (i.impact || 0), 0); }
+    return { currency:cc.currency, costDate:(cc.dataDate && cc.dataDate.d) || cc.trendDate || null, schedDate: sched ? sched.dataDate : null,
+      bac:v(cc.bac), pv:v(cc.pv), ev:v(cc.ev), ac:v(cc.ac), sv:cc.sv, cv:cc.cv, spi:cc.spi, cpi:cc.cpi, spiRep:v(cc.spiRep), cpiRep:v(cc.cpiRep),
+      eac:cc.eac, eacRep:v(cc.eacRep), vac:cc.vac, progress:cc.progress, used:cc.used,
+      schedPct: sc ? sc.pct : null, plannedFinish: sc ? sc.plannedFinish : null, forecastFinish: sc ? sc.forecastFinish : null, slip: sc ? sc.slip : null,
+      crit: sc ? sc.crit.length : null, neg: sc ? sc.neg.length : null, acts: sc ? sc.counts.total : null,
+      complete: sc ? sc.counts.complete : null, active: sc ? sc.counts.active : null, notstarted: sc ? sc.counts.notstarted : null,
+      projectStart, openIssues, openImpact };
+  }
+  const reviveDates = (k, v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(v)) ? new Date(v) : v;
+
+  root.PC = { parseNum, fmtMoney, fmtD, parseCostWorkbook, parseScheduleText, computeCost, computeSchedule, qualityChecks, sampleCostWorkbook, sampleXER, NEED, reportingMonth, snapshot, monthName, monthEnd, reviveDates };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+
+<!-- ======================= UI ======================= -->
+<script>
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const pct = v => v == null || !isFinite(v) ? '—' : (v*100).toFixed(1) + '%';
+  const r2 = v => v == null || !isFinite(v) ? '—' : v.toFixed(2);
+  const fmtD = PC.fmtD;
+  const code = s => `<code>${esc(s)}</code>`;
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const C = { green:'#1f9d55', orange:'#e08a00', red:'#d64045', blue:'#1450a3', blue5:'#2f7de1', indigo:'#5a4fcf', grey:'#94a3b8', none:'#b6c2d4' };
+  const statusOf = r => { if (r == null || !isFinite(r)) return 'none'; const x = Math.round(r*100)/100; return x >= 1 ? 'green' : x >= 0.9 ? 'orange' : 'red'; };
+  const nearDays = () => Math.max(0, parseFloat($('nearDays').value) || 0);
+
+  const state = { cost:{}, costFiles:{}, sched:null, cc:null, view:{}, pending:null, pendingImport:null, lastUpload:null };
+  let charts = [];
+  let money = (n, plus) => PC.fmtMoney(n, '', plus);
+
+  // ---------- messages ----------
+  function notice(type, html, id){
+    if (id){ const old = document.querySelector(`#msgs [data-nid="${id}"]`); if (old) old.remove(); }
+    const d = document.createElement('div'); d.className = 'msg ' + type; if (id) d.dataset.nid = id;
+    d.setAttribute('role', type === 'err' ? 'alert' : 'status');
+    d.innerHTML = `<div>${html}</div><button class="x" aria-label="Dismiss">×</button>`;
+    d.querySelector('.x').onclick = () => d.remove();
+    $('msgs').appendChild(d);
+    if (d.scrollIntoView) d.scrollIntoView({ block:'nearest' });
+    return d;
+  }
+  const MPP_HELP = name => `<b>“${esc(name)}” is a Microsoft Project .mpp file.</b> Browsers can't read that binary format, so please save it as XML first:
+    <ol><li>Open it in MS Project and choose <b>File › Save As</b>.</li><li>Set <b>Save as type</b> to <b>XML Format (*.xml)</b> and save.</li><li>Drop the new .xml file here.</li></ol>
+    No MS Project? The free ProjectLibre can open .mpp files and save them as MS Project XML. From Primavera P6, use <b>File › Export</b> and pick XER or P6 XML.`;
+
+  // ---------- gauge ----------
+  const CX = 100, CY = 100, R = 78;
+  const pt = (f, r) => { const a = Math.PI * (1 - f); return [CX + r*Math.cos(a), CY - r*Math.sin(a)]; };
+  function arc(f0, f1, r){
+    f0 = Math.max(0, Math.min(1, f0)); f1 = Math.max(0, Math.min(1, f1));
+    if (f1 - f0 < 0.0005) return '';
+    const [x0,y0] = pt(f0, r), [x1,y1] = pt(f1, r);
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  }
+  function gauge({ value, min, max, color, text, bands, minLabel, maxLabel, refAt }){
+    const f = value == null ? 0 : (Math.max(min, Math.min(max, value)) - min) / (max - min);
+    let s = `<svg class="gauge" viewBox="0 0 200 122" role="img" aria-label="${esc(text)}">`;
+    (bands || []).forEach(b => s += `<path d="${arc((b.from-min)/(max-min),(b.to-min)/(max-min),93)}" stroke="${b.c}" stroke-width="4" fill="none"/>`);
+    s += `<path d="${arc(0,1,R)}" stroke="#e8edf5" stroke-width="15" fill="none" stroke-linecap="round"/>`;
+    if (value != null) s += `<path d="${arc(0,f,R)}" stroke="${color}" stroke-width="15" fill="none" stroke-linecap="round"/>`;
+    if (refAt != null){ const fr = (refAt-min)/(max-min); const [a1,b1] = pt(fr,R-11), [a2,b2] = pt(fr,R+11); s += `<line x1="${a1}" y1="${b1}" x2="${a2}" y2="${b2}" stroke="#1b2a41" stroke-width="2" opacity=".55"/>`; }
+    s += `<text class="val${value == null ? ' na' : ''}" x="100" y="96" text-anchor="middle">${esc(text)}</text>`;
+    s += `<text class="lim" x="${CX-R}" y="118" text-anchor="middle">${esc(minLabel)}</text><text class="lim" x="${CX+R}" y="118" text-anchor="middle">${esc(maxLabel)}</text>`;
+    return s + '</svg>';
+  }
+  const BANDS = [{from:.5,to:.9,c:C.red},{from:.9,to:1,c:C.orange},{from:1,to:1.5,c:C.green}];
+
+  const srcOf = (lbl, o) => o ? `${lbl} ${code(o.ref)}` : `${lbl} <span class="neg">missing</span>`;
+  const needBlock = keys => `<div class="src need"><b>Needs</b>${keys.map(k => esc(PC.NEED[k])).join('<br>')}</div>`;
+  const missingKeys = (cc, keys) => keys.filter(k => !cc[k]);
+
+  // ---------- header & files ----------
+  function renderHeader(cc){
+    const name = (cc.name && cc.name.v) || (state.sched && state.sched.name) || 'Cost & Schedule Performance';
+    $('projName').textContent = name;
+    document.title = name + ' · Project Controls Dashboard';
+    const ch = [];
+    if (state.view.sample) ch.push('<span class="chip sample">SAMPLE DATA – fictional project</span>');
+    if (state.view.key) ch.push(`<span class="chip" style="font-weight:700">Report month: ${esc(PC.monthName(state.view.key))}</span>`);
+    ch.push(`<span class="chip">Cost data date: ${esc(cc.dataDate ? (cc.dataDate.d ? fmtD(cc.dataDate.d) : cc.dataDate.text + ' (last trend month)') : '—')}</span>`);
+    if (state.sched) ch.push(`<span class="chip">Schedule data date: ${esc(fmtD(state.sched.dataDate))}</span>`);
+    if (cc.bac) ch.push(`<span class="chip">BAC ${esc(money(cc.bac.v))}</span>`);
+    { const ix = readIndex(); let last = state.lastUpload; ix.forEach(x => { if (x.savedAt && (!last || x.savedAt > last)) last = x.savedAt; }); if (last) ch.push(`<span class="chip">Last upload: ${esc(fmtDT(last))}</span>`); }
+    $('metaChips').innerHTML = ch.join('');
+  }
+
+  function renderFiles(){
+    const c = state.cost, cards = [];
+    const L = { kpi:'KPI summary', trend:'Monthly trend', phase:'Phase / CBS summary', wp:'Work packages', issues:'Issues / risk log' };
+    const byFile = {};
+    Object.keys(L).forEach(t => { if (c[t]) (byFile[c[t].file] = byFile[c[t].file] || []).push(`${L[t]}: ${esc(c[t].sheet === c[t].file ? 'whole file' : `sheet “${c[t].sheet}”`)}, ${esc(c[t].rowsTxt)}`); });
+    Object.entries(state.costFiles).forEach(([f, info]) => {
+      const lines = (byFile[f] || []).concat(info.unrecognised.map(s => `<span class="neg">Not recognised: sheet “${esc(s)}”</span>`)).concat(info.dupes.map(esc));
+      cards.push(`<div class="file"><b>${esc(f)}</b>Cost report<ul>${lines.map(l => `<li>${l}</li>`).join('')}</ul></div>`);
+    });
+    if (state.sched){
+      const s = state.sched;
+      cards.push(`<div class="file"><b>${esc(s.file)}</b>${esc(s.kind)}<ul><li>${s.acts.length} activities, ${s.rels.length} relationship${s.rels.length === 1 ? "" : "s"}</li><li>Data date ${esc(fmtD(s.dataDate))} (${esc(s.dataDateField)})</li>${s.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul></div>`);
+    }
+    const missing = Object.keys(L).filter(t => !c[t]).map(t => L[t]);
+    if (!state.sched) missing.push('Schedule (.xer / .xml)');
+    if (missing.length) cards.push(`<div class="file" style="background:#fff"><b>Not loaded</b><ul>${missing.map(m => `<li>${esc(m)}</li>`).join('')}</ul></div>`);
+    cards.push(`<div class="files-actions"><button class="btn btn-primary btn-sm" id="btnAdd2">Add files</button></div>`);
+    $('filesPanel').innerHTML = cards.join('');
+    $('btnAdd2').onclick = () => $('fileInput').click();
+  }
+
+  // ---------- KPI cards ----------
+  function card({ name, formula, gaugeHtml, pill, pillClass, foot, extra, src }){
+    return `<div class="card kpi"><div class="kpi-top"><div><div class="kpi-name">${name}</div><div class="kpi-formula">${formula}</div></div>
+      <span class="pill ${pillClass}">${pill}</span></div>${gaugeHtml}<div class="kpi-foot">${foot || ''}</div>${extra || ''}${src}</div>`;
+  }
+
+  function idxCard(cc, which){
+    const isS = which === 'spi';
+    const calc = cc[which], rep = cc[which + 'Rep'];
+    const den = isS ? 'PV' : 'AC', denV = isS ? cc.pv : cc.ac;
+    const shown = calc != null ? calc : rep ? rep.v : null;
+    const st = statusOf(shown);
+    const TXT = isS ? { green:'On / ahead of schedule', orange:'Slightly behind', red:'Behind schedule' } : { green:'On / under budget', orange:'Slight overrun', red:'Cost overrun' };
+    let pill = st === 'none' ? 'No data' : TXT[st];
+    if (calc == null && rep) pill = 'Reported only';
+    let extra = `<div class="cmp"><div>Calculated<b>${r2(calc)}</b>EV ÷ ${den}</div><div>Reported in file<b>${rep ? r2(rep.v) : '—'}</b>${rep ? code(rep.ref) : 'not in file'}</div></div>`;
+    if (calc != null && rep && Math.abs(calc - rep.v) > 0.005) extra += `<div class="flag">⚠ Reported ${r2(rep.v)} ≠ calculated ${r2(calc)} (difference ${(rep.v - calc >= 0 ? '+' : '')}${(rep.v - calc).toFixed(3)}). The gauge shows the calculated value.</div>`;
+    else if (calc == null && rep) extra += `<div class="flag">⚠ Cannot be verified: EV or ${den} is missing. The gauge shows the reported value.</div>`;
+    const src = calc != null
+      ? `<div class="src"><b>Source</b>${srcOf('EV', cc.ev)} · ${srcOf(den, denV)}<br>EV ÷ ${den} = ${esc(money(cc.ev.v))} ÷ ${esc(money(denV.v))} = ${r2(calc)}</div>`
+      : needBlock(missingKeys(cc, ['ev', isS ? 'pv' : 'ac']));
+    const v = isS ? cc.sv : cc.cv;
+    return card({ name: isS ? 'Schedule Performance Index' : 'Cost Performance Index', formula: isS ? 'SPI = EV ÷ PV' : 'CPI = EV ÷ AC',
+      pill, pillClass: st === 'none' ? 'grey' : st,
+      gaugeHtml: gauge({ value: shown, min:.5, max:1.5, color:C[st], text:r2(shown), bands:BANDS, minLabel:'0.50', maxLabel:'1.50', refAt:1 }),
+      foot: v != null ? `${isS ? 'SV' : 'CV'} <b class="${v < 0 ? 'neg' : 'pos'}">${esc(money(v, true))}</b> (EV − ${den})` : '', extra, src });
+  }
+
+  function renderKPIs(cc){
+    const prog = cc.progress, used = cc.used;
+    const gap = prog != null && used != null ? used - prog : null;
+    const progSrc = prog != null ? `<div class="src"><b>Source</b>${srcOf('EV', cc.ev)} · ${srcOf('BAC', cc.bac)}<br>EV ÷ BAC = ${esc(money(cc.ev.v))} ÷ ${esc(money(cc.bac.v))}</div>` : needBlock(missingKeys(cc, ['ev','bac']));
+    const usedSrc = used != null ? `<div class="src"><b>Source</b>${srcOf('AC', cc.ac)} · ${srcOf('BAC', cc.bac)}<br>AC ÷ BAC = ${esc(money(cc.ac.v))} ÷ ${esc(money(cc.bac.v))}</div>` : needBlock(missingKeys(cc, ['ac','bac']));
+    $('kpis').innerHTML = [
+      card({ name:'Overall progress', formula:'EV ÷ BAC', pill:pct(prog), pillClass:prog == null ? 'grey' : 'blue',
+        gaugeHtml: gauge({ value: prog == null ? null : Math.min(prog, 1), min:0, max:1, color:C.blue, text:pct(prog), minLabel:'0%', maxLabel:'100%' }),
+        foot: prog != null ? `Earned <b>${esc(money(cc.ev.v))}</b> of <b>${esc(money(cc.bac.v))}</b>` : '', src:progSrc }),
+      card({ name:'Budget used', formula:'AC ÷ BAC', pill:pct(used), pillClass: used == null ? 'grey' : gap != null && gap > 0.005 ? 'orange' : 'blue',
+        gaugeHtml: gauge({ value: used == null ? null : Math.min(used, 1), min:0, max:1, color:C.indigo, text:pct(used), minLabel:'0%', maxLabel:'100%', refAt: prog != null ? Math.min(prog,1) : null }),
+        foot: used != null ? `Spent <b>${esc(money(cc.ac.v))}</b>` + (gap != null ? ` · ${(Math.abs(gap)*100).toFixed(1)} pts ${gap > 0 ? 'above' : 'below'} progress (tick mark)` : '') : '', src:usedSrc }),
+      idxCard(cc, 'spi'), idxCard(cc, 'cpi')
+    ].join('');
+    const notes = [];
+    if ([cc.ev, cc.pv, cc.ac].some(o => o && o.fromTrend)) notes.push('Some values taken from the last month of the trend sheet (see sources)');
+    if (cc.bac && cc.bac.calc) notes.push('BAC = sum of phase budgets');
+    $('costNote').textContent = notes.join(' · ');
+  }
+
+  function renderFigs(cc){
+    const f = (l, v, s, cls) => `<div class="fig"><div class="l">${l}</div><div class="v ${cls||''}">${v}</div><div class="s">${s}</div></div>`;
+    const raw = (o, k) => o ? f(k, esc(money(o.v)), code(o.ref)) : f(k, '—', `<span class="neg">needs ${k} in the file</span>`);
+    const calc = (k, v, formula, needs, cls, plus) => f(k, v == null ? '—' : esc(money(v, plus)), v == null ? `<span class="neg">needs ${needs}</span>` : esc(formula), v == null ? '' : cls);
+    $('figs').innerHTML = [ raw(cc.bac,'BAC'), raw(cc.pv,'PV'), raw(cc.ev,'EV'), raw(cc.ac,'AC'),
+      calc('SV', cc.sv, 'EV − PV', 'EV and PV', cc.sv < 0 ? 'neg' : 'pos', true), calc('CV', cc.cv, 'EV − AC', 'EV and AC', cc.cv < 0 ? 'neg' : 'pos', true),
+      calc('EAC (calc.)', cc.eac, 'BAC ÷ CPI', 'BAC, EV and AC', cc.bac && cc.eac > cc.bac.v ? 'neg' : ''),
+      cc.eacRep ? f('EAC (reported)', esc(money(cc.eacRep.v)), code(cc.eacRep.ref)) : f('EAC (reported)', '—', 'no EAC / FAC row in file'),
+      calc('VAC', cc.vac, 'BAC − EAC (calc.)', 'BAC, EV and AC', cc.vac < 0 ? 'neg' : 'pos', true) ].join('');
+  }
+
+  // ---------- quality ----------
+  function renderQuality(q){
+    const w = q.filter(x => x.status === 'warn').length, ok = q.filter(x => x.status === 'ok').length, na = q.filter(x => x.status === 'na').length;
+    $('qNote').textContent = 'Runs automatically on every load';
+    const order = { warn:0, ok:1, na:2 };
+    const rows = q.slice().sort((a,b) => order[a.status] - order[b.status]).map(x => {
+      const ic = x.status === 'warn' ? '!' : x.status === 'ok' ? '✓' : '–';
+      let body = x.status === 'na' ? `<div class="q-msg">Not checked – needs ${esc(x.need)}</div>` : `<div class="q-msg">${esc(x.msg)}</div>`;
+      if (x.items && x.items.length){
+        const shown = x.items.slice(0, 40);
+        body += `<details${x.items.length <= 4 ? ' open' : ''}><summary>${x.items.length} item${x.items.length > 1 ? 's' : ''}</summary><ul>${shown.map(i => `<li>${esc(i)}</li>`).join('')}${x.items.length > 40 ? `<li>…and ${x.items.length - 40} more</li>` : ''}</ul></details>`;
+      }
+      return `<div class="q ${x.status}"><div class="ic">${ic}</div><div><div class="q-title">${esc(x.title)}</div>${body}</div></div>`;
+    });
+    $('quality').innerHTML = `<div class="q-head"><span class="pill ${w ? 'orange' : 'green'}">${w} warning${w === 1 ? '' : 's'}</span><span class="pill green">${ok} passed</span><span class="pill grey">${na} not run (input missing)</span></div>` + rows.join('');
+  }
+
+  // ---------- schedule cards ----------
+  function renderSchedCards(sc){
+    const s = state.sched;
+    if (!s){
+      $('schedCards').innerHTML = `<div class="empty"><b>No schedule loaded</b>Drop a Primavera P6 <code>.xer</code> or an MS Project / P6 <code>.xml</code> to see activity status, critical path, the WBS breakdown, the Gantt and four schedule data-quality checks.</div>`;
+      $('schedNote').textContent = ''; return;
+    }
+    $('schedNote').textContent = `${s.kind} · ${s.file}`;
+    const c = sc.counts, T = c.total || 1;
+    const stCard = `<div class="card panel"><h3>Activity status</h3><p class="sub">${c.total} activities incl. milestones</p>
+      <div class="bignum"><div><div class="n" style="color:${C.grey}">${c.complete}</div><div class="t">Complete</div></div><div><div class="n" style="color:${C.blue5}">${c.active}</div><div class="t">In progress</div></div><div><div class="n">${c.notstarted}</div><div class="t">Not started</div></div></div>
+      <div class="sbar"><div style="width:${c.complete/T*100}%;background:${C.grey}"></div><div style="width:${c.active/T*100}%;background:${C.blue5}"></div><div style="width:${c.notstarted/T*100}%;background:#cbd5e1"></div></div>
+      <div class="dates"><div>Schedule % complete<b>${pct(sc.pct)}</b>duration-weighted</div><div>Cost report progress<b>${pct(state.cc.progress)}</b>EV ÷ BAC</div></div>
+      <div class="src"><b>Source</b>${esc(s.file)} › ${esc(s.fields.status)}; % complete from ${esc(s.fields.pct)}${sc.pctMethod ? `<br>Schedule % = ${esc(sc.pctMethod)}` : ''}</div></div>`;
+    const slip = sc.slip;
+    const slipPill = slip == null ? '<span class="pill grey">No planned dates</span>' : slip > 0 ? `<span class="pill red">${slip} days late</span>` : slip < 0 ? `<span class="pill green">${-slip} days early</span>` : '<span class="pill green">On time</span>';
+    const crCard = `<div class="card panel"><div class="kpi-top"><h3>Critical path</h3>${slipPill}</div><p class="sub">Forecast vs planned project finish</p>
+      <div class="dates"><div>Planned finish<b>${esc(fmtD(sc.plannedFinish))}</b>${sc.pAct ? esc(sc.pAct.code) : 'no planned dates in file'}</div><div>Forecast finish<b>${esc(fmtD(sc.forecastFinish))}</b>${sc.cAct ? esc(sc.cAct.code) : '—'}</div></div>
+      <div class="bignum"><div><div class="n" style="color:${C.red}">${sc.crit.length}</div><div class="t">Open, total float ≤ 0</div></div><div><div class="n" style="color:${C.red}">${sc.neg.length}</div><div class="t">of which negative</div></div><div><div class="n" style="color:${C.orange}">${sc.near.length}</div><div class="t">Near-critical (≤ ${nearDays()} d)</div></div></div>
+      <div class="src"><b>Source</b>Planned = latest ${esc(s.fields.planned)}; forecast = latest ${esc(s.fields.current)}; slip = forecast − planned in calendar days<br>Float = ${esc(s.fields.tf)}${sc.withTF < sc.open.length ? ` · ${sc.open.length - sc.withTF} open activities have no float value` : ''}</div></div>`;
+    const top = sc.crit.slice().sort((a,b) => a.tf - b.tf).slice(0, 8);
+    const listCard = `<div class="card panel"><h3>Most critical open activities</h3><p class="sub">Lowest total float first</p>${top.length ? `<div class="tbl-wrap" style="max-height:270px"><table class="tbl"><thead><tr><th>Activity</th><th>TF (d)</th><th>Finish</th></tr></thead><tbody>${top.map(a => `<tr><td><span style="color:var(--muted)">${esc(a.code)}</span> ${esc(a.name)}</td><td class="num neg">${Math.round(a.tf*10)/10}</td><td class="num">${esc(fmtD(a.cF))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No open activities with zero or negative float</div>'}
+      <div class="src"><b>Source</b>${esc(s.fields.tf)}</div></div>`;
+    $('schedCards').innerHTML = `<div class="grid3">${stCard}${crCard}${listCard}</div>`;
+  }
+
+  // ---------- charts ----------
+  const emptyBox = (id, title, body) => $(id).innerHTML = `<div class="empty"><b>${title}</b>${body}</div>`;
+  function box(id, h){ $(id).innerHTML = `<div class="chart-box"${h ? ` style="height:${h}px"` : ''}><canvas></canvas></div><div class="src" data-src></div>`; return $(id).querySelector('canvas'); }
+  const setSrc = (id, html) => { const e = $(id).querySelector('[data-src]'); if (e) e.innerHTML = html; };
+
+  function renderCharts(sc){
+    charts.forEach(ch => ch.destroy()); charts = [];
+    const hasChart = typeof Chart !== 'undefined';
+    const noLib = id => emptyBox(id, 'Chart library not loaded', 'Charts need an internet connection to load Chart.js from cdnjs.');
+    if (hasChart){ Chart.defaults.font.family = getComputedStyle(document.body).fontFamily; Chart.defaults.color = '#5d6b82'; }
+    const grid = { color:'#eef2f8' };
+    const tr = state.cost.trend;
+    const colRef = k => { const a = tr.rows[0].refs[k], b = tr.rows[tr.rows.length-1].refs[k]; return a ? `${a}:${b.split('!').pop()}` : null; };
+
+    if (!tr) emptyBox('sCurveWrap', 'No monthly trend sheet', 'Needs a sheet with <code>Month</code>, <code>Planned cumulative</code> and <code>Actual cumulative</code> columns.');
+    else if (!hasChart) noLib('sCurveWrap');
+    else {
+      const ds = [
+        { label:'Planned value (PV)', data:tr.rows.map(r => r.pv), borderColor:C.blue5, backgroundColor:'rgba(47,125,225,.10)', fill:true, borderWidth:2.5, pointRadius:0, pointHoverRadius:4, tension:.3 },
+        { label:'Actual cost (AC)', data:tr.rows.map(r => r.ac), borderColor:'#e0662f', backgroundColor:'#e0662f', borderWidth:2.5, pointRadius:2, pointHoverRadius:5, tension:.3 } ];
+      if (tr.hasEV) ds.push({ label:'Earned value (EV)', data:tr.rows.map(r => r.ev), borderColor:C.green, backgroundColor:C.green, borderWidth:2, borderDash:[5,4], pointRadius:0, pointHoverRadius:4, tension:.3 });
+      charts.push(new Chart(box('sCurveWrap'), { type:'line', data:{ labels:tr.rows.map(r => r.label), datasets:ds },
+        options:{ responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
+          plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8 } }, tooltip:{ callbacks:{ label:x => ` ${x.dataset.label}: ${money(x.parsed.y)}` } } },
+          scales:{ x:{ grid:{display:false}, ticks:{ maxRotation:0, autoSkip:true, autoSkipPadding:12 } }, y:{ beginAtZero:true, grid, ticks:{ callback:v => money(v) } } } } }));
+      setSrc('sCurveWrap', `<b>Source</b>PV ${code(colRef('pv'))} “${esc(tr.colNames.pv)}” · AC ${code(colRef('ac'))} “${esc(tr.colNames.ac)}”${tr.hasEV ? ` · EV ${code(colRef('ev'))} “${esc(tr.colNames.ev)}”` : ''}`);
+    }
+
+    if (!tr || (!tr.hasSPI && !tr.hasCPI)) emptyBox('idxWrap', 'No SPI / CPI columns', 'Needs <code>SPI</code> and <code>CPI</code> columns in the monthly trend sheet.');
+    else if (!hasChart) noLib('idxWrap');
+    else {
+      const sp = tr.rows.map(r => r.spi), cp = tr.rows.map(r => r.cpi);
+      const all = sp.concat(cp).filter(v => v != null);
+      const lo = Math.min(0.85, ...all) - 0.03, hi = Math.max(1.1, ...all) + 0.03;
+      charts.push(new Chart(box('idxWrap'), { type:'line', data:{ labels:tr.rows.map(r => r.label), datasets:[
+          { label:'SPI', data:sp, borderColor:C.blue5, backgroundColor:C.blue5, borderWidth:2.2, pointRadius:2, tension:.25 },
+          { label:'CPI', data:cp, borderColor:'#e0662f', backgroundColor:'#e0662f', borderWidth:2.2, pointRadius:2, tension:.25 },
+          { label:'1.00', data:tr.rows.map(() => 1), borderColor:'#94a3b8', borderDash:[4,4], borderWidth:1.2, pointRadius:0, pointHoverRadius:0 } ] },
+        options:{ responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false },
+          plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8, filter:i => i.text !== '1.00' } }, tooltip:{ filter:i => i.dataset.label !== '1.00', callbacks:{ label:x => ` ${x.dataset.label}: ${x.parsed.y.toFixed(2)}` } } },
+          scales:{ x:{ grid:{display:false}, ticks:{ maxRotation:0, autoSkip:true, autoSkipPadding:12 } }, y:{ min:Math.floor(lo*20)/20, max:Math.ceil(hi*20)/20, grid, ticks:{ callback:v => (+v).toFixed(2) } } } } }));
+      setSrc('idxWrap', `<b>Source</b>${tr.hasSPI ? `SPI ${code(colRef('spi'))}` : 'no SPI column'} · ${tr.hasCPI ? `CPI ${code(colRef('cpi'))}` : 'no CPI column'} (values as reported)`);
+    }
+
+    const ph = state.cost.phase;
+    if (!ph) emptyBox('phaseWrap', 'No phase / CBS sheet', 'Needs a sheet with a <code>Phase</code> (or CBS / Discipline) column and a <code>Budget</code> column.');
+    else if (!hasChart) noLib('phaseWrap');
+    else {
+      const pal = ['#0b2a5b','#1450a3','#2f7de1','#7fb2f0','#1f9d55','#e08a00','#7c5cd6','#94a3b8','#d64045','#14b8a6'];
+      const total = ph.sum, narrow = window.innerWidth < 640;
+      const center = { id:'centerTotal', afterDraw(ch){ const { ctx, chartArea:a } = ch; const x = (a.left + a.right) / 2, y = (a.top + a.bottom) / 2;
+        ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#5d6b82'; ctx.font = '600 12px ' + Chart.defaults.font.family; ctx.fillText('Total budget', x, y - 12);
+        ctx.fillStyle = '#1b2a41'; ctx.font = '700 19px ' + Chart.defaults.font.family; ctx.fillText(money(total), x, y + 10); ctx.restore(); } };
+      charts.push(new Chart(box('phaseWrap', narrow ? 380 : 320), { type:'doughnut', plugins:[center],
+        data:{ labels:ph.items.map(p => `${p.name} · ${money(p.budget)} (${(p.budget/total*100).toFixed(1)}%)`), datasets:[{ data:ph.items.map(p => p.budget), backgroundColor:ph.items.map((p,i) => pal[i % pal.length]), borderColor:'#fff', borderWidth:2 }] },
+        options:{ responsive:true, maintainAspectRatio:false, cutout:'64%', plugins:{ legend:{ position: narrow ? 'bottom' : 'right', labels:{ usePointStyle:true, boxWidth:8, font:{ size:11.5 } } }, tooltip:{ callbacks:{ label:x => ` ${x.label}` } } } } }));
+      setSrc('phaseWrap', `<b>Source</b>“${esc(ph.budgetCol)}” ${code(ph.range)}; centre total = SUM of these cells${ph.reportedTotal ? ` (the file's own total row ${code(ph.reportedTotal.ref)} = ${esc(money(ph.reportedTotal.v))})` : ''}`);
+    }
+
+    if (!sc) emptyBox('wbsWrap', 'No schedule loaded', 'Needs a P6 <code>.xer</code> or an MS Project / P6 <code>.xml</code> with WBS.');
+    else if (!hasChart) noLib('wbsWrap');
+    else {
+      const w = sc.byWbs;
+      charts.push(new Chart(box('wbsWrap', Math.max(240, 46 * w.length + 80)), { type:'bar',
+        data:{ labels:w.map(x => x.name), datasets:[
+          { label:'Complete', data:w.map(x => x.complete), backgroundColor:C.grey },
+          { label:'In progress', data:w.map(x => x.active), backgroundColor:C.blue5 },
+          { label:'Not started', data:w.map(x => x.notstarted), backgroundColor:'#cbd5e1' } ] },
+        options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8 } } },
+          scales:{ x:{ stacked:true, grid, ticks:{ precision:0 }, title:{ display:true, text:'Activities' } }, y:{ stacked:true, grid:{ display:false } } } } }));
+      setSrc('wbsWrap', `<b>Source</b>${esc(state.sched.file)} › ${esc(state.sched.fields.status)}, counted per top-level WBS element`);
+    }
+  }
+
+  // ---------- Gantt ----------
+  function renderGantt(sc){
+    const s = state.sched, el = $('gantt');
+    $('gControls').style.display = s ? 'flex' : 'none';
+    if (!s){ el.innerHTML = `<div class="empty"><b>No schedule loaded</b>Needs a P6 <code>.xer</code> or an MS Project / P6 <code>.xml</code>.</div>`; $('ganttNote').textContent = ''; return; }
+    const nd = nearDays();
+    let acts = s.acts.slice();
+    if ($('fOpen').checked) acts = acts.filter(a => a.status !== 'complete');
+    if ($('fCrit').checked) acts = acts.filter(a => a.status !== 'complete' && a.tf != null && a.tf <= nd);
+    const order = new Map(sc.byWbs.map((w,i) => [w.name, i]));
+    acts.sort((a,b) => (order.get(a.wbs) - order.get(b.wbs)) || ((a.pS || a.cS || 0) - (b.pS || b.cS || 0)));
+    const CAP = 400, total = acts.length; acts = acts.slice(0, CAP);
+    $('ganttNote').textContent = `${total} of ${s.acts.length} activities shown`;
+    if (!acts.length){ el.innerHTML = '<div class="empty">No activities match the filters.</div>'; return; }
+
+    const ds = [];
+    acts.forEach(a => [a.pS,a.pF,a.cS,a.cF].forEach(d => d && ds.push(+d)));
+    if (s.dataDate) ds.push(+s.dataDate);
+    let t0 = new Date(Math.min(...ds)), t1 = new Date(Math.max(...ds));
+    t0 = new Date(t0.getFullYear(), t0.getMonth(), 1); t1 = new Date(t1.getFullYear(), t1.getMonth() + 1, 1);
+    const days = (t1 - t0) / 864e5;
+    const LBL = window.innerWidth < 600 ? 150 : 300;
+    const ppd = Math.max(1.4, Math.min(10, 1000 / days));
+    const W = Math.round(days * ppd);
+    const x = d => (d - t0) / 864e5 * ppd;
+
+    let head = '';
+    const step = 30 * ppd >= 44 ? 1 : 30 * ppd >= 15 ? 3 : 6;
+    for (let m = new Date(t0); m < t1; m = new Date(m.getFullYear(), m.getMonth() + 1, 1))
+      head += `<div class="g-tick" style="left:${x(m)}px">${m.getMonth() % step === 0 ? MON[m.getMonth()] + ' ' + String(m.getFullYear()).slice(2) : ''}</div>`;
+    const rows = [`<div class="g-row g-head"><div class="g-lbl" style="width:${LBL}px">Activity</div><div class="g-track" style="width:${W}px">${head}</div></div>`];
+    let grp = null;
+    acts.forEach(a => {
+      if (a.wbs !== grp){ grp = a.wbs; rows.push(`<div class="g-row g-grp"><div class="g-lbl" style="width:${LBL}px">${esc(grp)}</div><div class="g-track" style="width:${W}px"></div></div>`); }
+      const open = a.status !== 'complete';
+      const crit = open && a.tf != null && a.tf <= 0, near = !crit && open && a.tf != null && a.tf <= nd;
+      const col = !open ? C.grey : crit ? C.red : near ? C.orange : C.blue5;
+      const tip = `${a.code} ${a.name}\nPlanned: ${fmtD(a.pS)} → ${fmtD(a.pF)}\nCurrent: ${fmtD(a.cS)} → ${fmtD(a.cF)}\nStatus: ${a.status === 'active' ? 'in progress' : a.status === 'notstarted' ? 'not started' : 'complete'}${a.pct != null ? ` · ${Math.round(a.pct)}%` : ''}\nTotal float: ${a.tf == null ? '—' : (Math.round(a.tf*10)/10) + ' d'}`;
+      let bars = '';
+      if (a.milestone){
+        if (a.pF) bars += `<div class="g-ms plan" style="left:${x(a.pF) - 3.5}px"></div>`;
+        if (a.cF || a.cS) bars += `<div class="g-ms" style="left:${x(a.cF || a.cS) - 4.5}px;background:${col}"></div>`;
+      } else {
+        if (a.pS && a.pF) bars += `<div class="g-bar plan" style="left:${x(a.pS)}px;width:${Math.max(2, x(a.pF) - x(a.pS))}px"></div>`;
+        if (a.cS && a.cF) bars += `<div class="g-bar cur" style="left:${x(a.cS)}px;width:${Math.max(2, x(a.cF) - x(a.cS))}px;background:${col}"></div>`;
+      }
+      rows.push(`<div class="g-row" title="${esc(tip)}"><div class="g-lbl" style="width:${LBL}px"><span class="code">${esc(a.code)}</span>${esc(a.name)}</div><div class="g-track" style="width:${W}px">${bars}</div></div>`);
+    });
+    const dd = s.dataDate ? `<div class="g-dd" style="left:${LBL + x(s.dataDate)}px"><span>Data date ${esc(fmtD(s.dataDate))}</span></div>` : '';
+    el.innerHTML = `<div class="g-scroll"><div class="g-inner" style="width:${LBL + W}px">${rows.join('')}${dd}</div></div>
+      <div class="g-note">${total > CAP ? `Showing the first ${CAP} of ${total} – use the filters to narrow down. ` : ''}${s.dataDate ? '' : 'No data date in the file, so no data-date line. '}Hover a row for dates and float. Planned = ${esc(s.fields.planned)}; current = ${esc(s.fields.current)}.</div>`;
+  }
+
+  // ---------- issues & work packages ----------
+  function renderIssues(){
+    const is = state.cost.issues;
+    if (!is){ emptyBox('issues', 'No issues / risk log', 'Needs a sheet with headers such as <code>ID</code>, <code>Title</code>, <code>Priority</code>, <code>Cost impact</code>, <code>Owner</code>, <code>Status</code>.'); $('issuesNote').textContent = ''; return; }
+    const open = is.items.filter(i => i.open).sort((a,b) => (a.rank - b.rank) || ((b.impact || 0) - (a.impact || 0)));
+    const totalImp = open.reduce((s,i) => s + (i.impact || 0), 0);
+    $('issuesNote').textContent = `${open.length} open of ${is.items.length}` + (is.hasImpact ? ` · open cost impact ${money(totalImp)} (sum of column)` : '');
+    const pri = p => { const n = (p || '').toLowerCase(); const c = /crit|very high|urgent|high/.test(n) ? 'red' : /med|moder/.test(n) ? 'orange' : /low/.test(n) ? 'green' : 'grey'; return p ? `<span class="pill ${c}">${esc(p)}</span>` : '—'; };
+    const rows = open.map(i => `<tr><td>${esc(i.id) || '—'}</td><td>${esc(i.title)}${i.type ? ` <span style="color:var(--muted)">· ${esc(i.type)}</span>` : ''}</td><td>${pri(i.priority)}</td><td class="num">${i.impact != null ? esc(money(i.impact)) : esc(i.impactText || '—')}</td><td>${esc(i.owner) || '—'}</td><td class="num">${esc(i.due) || '—'}</td><td>${esc(i.status) || '—'}</td><td class="num" style="color:var(--muted)">${i.row}</td></tr>`).join('');
+    $('issues').innerHTML = (open.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>ID</th><th>Title</th><th>Priority</th><th>Cost impact</th><th>Owner</th><th>Due</th><th>Status</th><th>Row</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty">No open items.</div>')
+      + `<div class="src"><b>Source</b>${esc(is.file)} › ${esc(is.sheet)}. Sorted by ${is.priorityCol ? `“${esc(is.priorityCol)}”` : 'priority (no priority column)'}, then ${is.impactCol ? `“${esc(is.impactCol)}”` : 'cost impact (no impact column)'}, largest first.${is.hasStatus ? ' Closed, resolved and cancelled items are hidden.' : ' No status column, so every row is treated as open.'}</div>`;
+  }
+
+  function renderWPs(){
+    const w = state.cost.wp;
+    if (!w){ emptyBox('wps', 'No work-package sheet', 'Optional. Needs headers such as <code>Work package</code>, <code>Budget</code>, <code>Earned value</code>, <code>Actual cost</code>.'); $('wpNote').textContent = ''; return; }
+    const items = w.items.map(i => Object.assign({}, i, { cv: i.ev != null && i.ac != null ? i.ev - i.ac : null, cpi: i.ev != null && i.ac ? i.ev / i.ac : null }))
+      .sort((a,b) => ((a.cv == null) - (b.cv == null)) || (a.cv - b.cv));
+    $('wpNote').textContent = `${items.length} work packages · worst cost variance first`;
+    const rows = items.map(i => `<tr><td>${esc(i.code)}</td><td>${esc(i.name)}${i.phase ? ` <span style="color:var(--muted)">· ${esc(i.phase)}</span>` : ''}</td><td class="num">${esc(money(i.budget))}</td><td class="num">${i.ev != null ? esc(money(i.ev)) : '—'}</td><td class="num">${i.ac != null ? esc(money(i.ac)) : '—'}</td><td class="num ${i.cv < 0 ? 'neg' : ''}">${i.cv != null ? esc(money(i.cv, true)) : '—'}</td><td class="num">${i.cpi != null ? `<span class="pill ${statusOf(i.cpi)}">${r2(i.cpi)}</span>` : '—'}</td><td class="num" style="color:var(--muted)">${i.row}</td></tr>`).join('');
+    $('wps').innerHTML = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Code</th><th>Work package</th><th>Budget</th><th>EV</th><th>AC</th><th>CV</th><th>CPI</th><th>Row</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="src"><b>Source</b>${esc(w.file)} › ${esc(w.sheet)}. CV = EV − AC and CPI = EV ÷ AC are calculated per row${w.hasEV && w.hasAC ? '' : ' (EV or AC column missing, so they show “—”)'}.</div>`;
+  }
+
+  // ---------- small helpers ----------
+  const pad2 = n => String(n).padStart(2,'0');
+  const fmtDT = d => d ? `${fmtD(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}` : '—';
+  const mName = k => PC.monthName(k);
+  function toast(t){
+    let el = $('toast'); if (!el){ el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; el.setAttribute('role','status'); document.body.appendChild(el); }
+    el.textContent = t; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 2800);
+  }
+  function download(name, text, mime){ const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: mime || 'text/plain' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 800); }
+  const stamp = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; };
+
+  // ---------- browser storage ----------
+  const IDX = 'pcd.index', REC = 'pcd.m.', LAYOUT = 'pcd.layout', LIMIT = 5 * 1024 * 1024;
+  const LS = (() => { try { const k = 'pcd.__test'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return localStorage; } catch (e){ return null; } })();
+  const isQuota = e => !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22 || e.code === 1014 || /quota/i.test(e.message || ''));
+  function readIndex(){ if (!LS) return []; try { return (JSON.parse(LS.getItem(IDX) || '[]', PC.reviveDates) || []).sort((a,b) => a.key < b.key ? -1 : a.key > b.key ? 1 : 0); } catch (e){ return []; } }
+  const writeIndex = ix => LS.setItem(IDX, JSON.stringify(ix));
+  const pack = o => { const s = JSON.stringify(o); return window.LZString ? 'z:' + LZString.compressToUTF16(s) : 'p:' + s; };
+  function unpack(str){
+    if (!str) return null;
+    if (str.startsWith('z:')){
+      if (!window.LZString) throw new Error('This month is stored compressed and the decompression library could not load. Connect to the internet and reload the page.');
+      return JSON.parse(LZString.decompressFromUTF16(str.slice(2)), PC.reviveDates);
+    }
+    return JSON.parse(str.slice(2), PC.reviveDates);
+  }
+  function storageUsed(){ if (!LS) return 0; let n = 0; for (let i = 0; i < LS.length; i++){ const k = LS.key(i); if (k && k.startsWith('pcd.')) n += (k.length + (LS.getItem(k) || '').length) * 2; } return n; }
+  function storageFull(what){
+    notice('err', `<b>Browser storage is full – ${esc(what)} was not saved.</b> Browsers give a page roughly 5 MB. Export a backup, then delete months you no longer need, and upload again.
+      <div class="acts"><button class="btn btn-sm btn-primary" data-act="backup">Export backup (.json)</button><button class="btn btn-sm btn-outline" data-act="goto-months">Go to stored months</button></div>`, 'quota');
+  }
+  function saveMonth(rec){
+    if (!LS){ notice('err', '<b>This browser blocks local storage</b> (private window or a security setting), so months cannot be saved. The files you load are still shown.', 'nols'); return false; }
+    const packed = pack(rec), old = LS.getItem(REC + rec.key);
+    try {
+      LS.setItem(REC + rec.key, packed);
+      const ix = readIndex().filter(x => x.key !== rec.key);
+      ix.push({ key:rec.key, project:rec.project, savedAt:rec.savedAt, sample:!!rec.sample, monthSrc:rec.monthSrc, files:rec.files, size:packed.length * 2, kpi:rec.kpi });
+      writeIndex(ix);
+      if (storageUsed() > 0.8 * LIMIT) notice('warn', `<b>Browser storage is ${(storageUsed() / LIMIT * 100).toFixed(0)}% full.</b> Export a backup soon and delete old months to make room.`, 'quota-soon');
+      return true;
+    } catch (e){
+      try { if (old != null) LS.setItem(REC + rec.key, old); else LS.removeItem(REC + rec.key); } catch (_){}
+      if (isQuota(e)) storageFull(mName(rec.key)); else notice('err', `Could not save ${esc(mName(rec.key))}: ${esc(e.message)}`);
+      return false;
+    }
+  }
+  function deleteMonth(key){ if (!LS) return; LS.removeItem(REC + key); writeIndex(readIndex().filter(x => x.key !== key)); }
+  const loadRecord = key => LS ? unpack(LS.getItem(REC + key)) : null;
+
+  function buildRecord(key, monthSrc, sample, savedAt){
+    const cc = PC.computeCost(state.cost);
+    const sc = state.sched ? PC.computeSchedule(state.sched, nearDays()) : null;
+    return { v:1, key, project:(cc.name && cc.name.v) || (state.sched && state.sched.name) || '', savedAt: savedAt || new Date(), sample:!!sample, monthSrc,
+      files:{ cost:Object.keys(state.costFiles), sched: state.sched ? state.sched.file : null },
+      cost:state.cost, costFiles:state.costFiles, sched:state.sched, kpi:PC.snapshot(state.cost, cc, state.sched, sc) };
+  }
+  function recomputeKpi(rec){
+    const cc = PC.computeCost(rec.cost || {}); const sc = rec.sched ? PC.computeSchedule(rec.sched, 10) : null;
+    rec.kpi = PC.snapshot(rec.cost || {}, cc, rec.sched || null, sc); return rec;
+  }
+
+  function resetToEmpty(){
+    state.cost = {}; state.costFiles = {}; state.sched = null; state.view = {};
+    charts.forEach(c => c.destroy()); charts = [];
+    $('dash').style.display = 'none'; $('upload').style.display = 'block'; $('headActions').style.display = 'none';
+    $('projName').textContent = 'Cost & Schedule Performance'; $('metaChips').innerHTML = '<span class="chip">Load a cost report and/or a schedule to begin</span>';
+    $('foot').innerHTML = 'Built by Sara Mostafshar with Claude. Files are read in your browser only. · <a href="project-controls-dashboard-with-sample-data.zip" download>Download sample data (4 months)</a>'; document.title = 'Project Controls Dashboard';
+  }
+
+  function openMonth(key){
+    let rec;
+    try { rec = loadRecord(key); } catch (e){ notice('err', esc(e.message)); return; }
+    if (!rec){ notice('err', `${esc(mName(key))} could not be found in browser storage.`); return; }
+    state.cost = rec.cost || {}; state.costFiles = rec.costFiles || {}; state.sched = rec.sched || null;
+    state.view = { key, savedAt:rec.savedAt, monthSrc:rec.monthSrc, sample:!!rec.sample, saved:true };
+    state.cmpA = state.cmpB = null;
+    renderAll();
+  }
+
+  // ---------- uploads ----------
+  function addCost(tgt, wb, name){
+    const r = PC.parseCostWorkbook(XLSX, wb, name);
+    const types = Object.keys(r.found);
+    if (!types.length){ notice('err', `<b>Nothing recognised in “${esc(name)}”.</b> The dashboard looks for header rows such as <code>Metric | Value</code>, <code>Month | Planned cumulative | Actual cumulative</code>, <code>Phase | Budget</code>, <code>Work package | Budget</code> or <code>Title | Priority | Cost impact</code>. Check that the header row is in the first 25 rows.`); return false; }
+    types.forEach(t => tgt.cost[t] = r.found[t]);
+    tgt.costFiles[name] = { unrecognised:r.unrecognised, dupes:r.dupes };
+    Object.keys(tgt.costFiles).forEach(f => { if (f !== name && !Object.values(tgt.cost).some(x => x.file === f)) delete tgt.costFiles[f]; });
+    return true;
+  }
+  function friendly(n, e){
+    const m = String((e && e.message) || e);
+    if (/password|encrypt|protected/i.test(m)) return `<b>“${esc(n)}” is password-protected.</b> Remove the password in Excel (File › Info › Protect Workbook), save, and drop it again.`;
+    if (/zip|corrupt|end of data|unsupported file|invalid html|cfb/i.test(m)) return `<b>“${esc(n)}” could not be opened.</b> It may be damaged or not really a spreadsheet. Open it in Excel, choose Save As › Excel Workbook (.xlsx), and try again.`;
+    return `<b>Problem with “${esc(n)}”:</b> ${esc(m)}`;
+  }
+  const readAs = (file, how) => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = e => res(e.target.result); fr.onerror = () => rej(new Error(`Could not read “${file.name}” – it may have been moved or is still open in another program.`)); how === 'text' ? fr.readAsText(file) : fr.readAsArrayBuffer(file); });
+
+  async function parseFiles(files){
+    const batch = { cost:{}, costFiles:{}, sched:null };
+    for (const f of files){
+      const n = f.name;
+      if (f.size > 10 * 1024 * 1024) notice('warn', `<b>“${esc(n)}” is ${(f.size / 1048576).toFixed(1)} MB.</b> Files over 10 MB can take a while to read and may not fit in browser storage. If you can, export only the project or sheets you report on.`);
+      try {
+        if (/\.mpp$/i.test(n)){ notice('warn', MPP_HELP(n)); continue; }
+        if (/\.json$/i.test(n)){ await importBackup(f); continue; }
+        if (/\.(xer|xml)$/i.test(n)){
+          const s = PC.parseScheduleText(await readAs(f, 'text'), n, DOMParser);
+          if (!s.acts.length) notice('warn', `“${esc(n)}” was read, but it contains no activities.`);
+          batch.sched = s; continue;
+        }
+        if (/\.(xlsx|xlsm|xls|csv)$/i.test(n)){
+          if (!window.XLSX){ notice('err', 'The spreadsheet reader could not load. Open this page while connected to the internet – it loads three small libraries from cdnjs.'); continue; }
+          const wb = /\.csv$/i.test(n) ? XLSX.read(await readAs(f, 'text'), { type:'string', raw:true }) : XLSX.read(new Uint8Array(await readAs(f)), { type:'array', cellDates:true });
+          addCost(batch, wb, n); continue;
+        }
+        notice('err', `<b>“${esc(n)}” is not a supported file.</b> Use .xlsx, .xls or .csv for cost reports, .xer or .xml for schedules, and .json for backups. (.mpp files: save as XML first.)`);
+      } catch (e){ notice('err', friendly(n, e)); }
+    }
+    return batch;
+  }
+
+  function useBatch(b){ state.cost = b.cost; state.costFiles = b.costFiles; state.sched = b.sched; }
+
+  function commit(batch, key, src, merge){
+    if (merge){
+      let base = { cost:{}, costFiles:{}, sched:null };
+      if (state.view.key === key) base = { cost:state.cost, costFiles:state.costFiles, sched:state.sched };
+      else { try { const r = loadRecord(key); if (r) base = { cost:r.cost || {}, costFiles:r.costFiles || {}, sched:r.sched || null }; } catch (e){} }
+      state.cost = Object.assign({}, base.cost, batch.cost);
+      state.costFiles = Object.assign({}, base.costFiles, batch.costFiles);
+      state.sched = batch.sched || base.sched;
+      Object.keys(state.costFiles).forEach(f => { if (!Object.values(state.cost).some(x => x.file === f)) delete state.costFiles[f]; });
+    } else useBatch(batch);
+    const rec = buildRecord(key, src, false, new Date());
+    const ok = saveMonth(rec);
+    state.view = { key, savedAt:rec.savedAt, monthSrc:src, sample:false, saved:ok };
+    state.cmpA = state.cmpB = null;
+    if (ok) toast(`${merge ? 'Updated' : 'Saved'} ${mName(key)} · ${readIndex().length} month${readIndex().length === 1 ? '' : 's'} stored`);
+    renderAll();
+  }
+
+  async function handleFiles(list, opts){
+    opts = opts || {};
+    const files = Array.from(list || []); if (!files.length) return;
+    // parse each file on its own, so that several months dropped together can be filed separately
+    const parts = [];
+    for (const f of files){ const b = await parseFiles([f]); if (Object.keys(b.cost).length || b.sched) parts.push(b); }
+    if (!parts.length) return;
+    const join = list => { const b = { cost:{}, costFiles:{}, sched:null }; list.forEach(x => { Object.assign(b.cost, x.cost); Object.assign(b.costFiles, x.costFiles); if (x.sched) b.sched = x.sched; }); return b; };
+    const batch = join(parts);
+    state.lastUpload = new Date();
+    const ix = readIndex();
+    if (ix.some(x => x.sample)){
+      ix.filter(x => x.sample).forEach(x => deleteMonth(x.key));
+      if (state.view.sample) state.view = {};
+      notice('warn', 'The sample months were removed so they don\'t mix with your own data.', 'sample-removed');
+    }
+    // the same kind of sheet (or a schedule) in more than one file means several months were dropped at once
+    const kinds = parts.flatMap(x => Object.keys(x.cost).concat(x.sched ? ['sched'] : []));
+    if (!opts.replaceKey && new Set(kinds).size < kinds.length){
+      const groups = new Map(), loose = [];
+      parts.forEach(x => { const m = PC.reportingMonth(PC.computeCost(x.cost), x.sched); if (!m) loose.push(x); else { if (!groups.has(m.key)) groups.set(m.key, { src:m.src, list:[] }); groups.get(m.key).list.push(x); } });
+      if (groups.size > 1){
+        const keys = [...groups.keys()].sort();
+        keys.forEach(k => commit(join(groups.get(k).list), k, groups.get(k).src, readIndex().some(x => x.key === k)));
+        if (loose.length) notice('warn', `${loose.length} file(s) had no data date and were not filed. Drop them again on their own while the right month is open.`);
+        toast(`Filed ${keys.length} months: ${keys.map(mName).join(', ')}`);
+        return;
+      }
+    }
+    const bm = PC.reportingMonth(PC.computeCost(batch.cost), batch.sched);
+    if (opts.replaceKey){
+      if (bm && bm.key !== opts.replaceKey) notice('warn', `These files look like <b>${esc(mName(bm.key))}</b> (${esc(bm.src)}), but they were stored as <b>${esc(mName(opts.replaceKey))}</b> because you chose Replace on that row.`);
+      return commit(batch, opts.replaceKey, bm ? bm.src : 'chosen with Replace in the Stored months table', false);
+    }
+    if (!bm){
+      if (state.view.key && state.view.saved) return commit(batch, state.view.key, state.view.monthSrc, true);
+      useBatch(batch); state.view = { key:null, saved:false };
+      notice('warn', '<b>No data date found in these files</b>, so the reporting month is unknown. Pick the month in the bar below and press <b>Save month</b>.', 'nomonth');
+      return renderAll();
+    }
+    if (state.view.key === bm.key && state.view.saved) return commit(batch, bm.key, bm.src, true);
+    const stored = readIndex().find(x => x.key === bm.key);
+    if (stored){
+      state.pending = { batch, key:bm.key, src:bm.src };
+      notice('warn', `<b>${esc(mName(bm.key))} is already stored</b> (uploaded ${esc(fmtDT(stored.savedAt))}). What should happen to the files you just dropped?
+        <div class="acts"><button class="btn btn-sm btn-danger" data-act="pend-replace">Replace ${esc(mName(bm.key))}</button><button class="btn btn-sm btn-outline" data-act="pend-add">Add them to ${esc(mName(bm.key))}</button><button class="btn btn-sm btn-outline" data-act="pend-cancel">Cancel</button></div>`, 'pending');
+      return;
+    }
+    return commit(batch, bm.key, bm.src, false);
+  }
+
+  function saveManual(key, btn){
+    if (!/^\d{4}-\d{2}$/.test(key || '')){ toast('Choose a month first'); return; }
+    if (readIndex().some(x => x.key === key) && !(btn && btn.classList.contains('confirm'))){
+      btn.classList.add('btn-danger'); btn.classList.add('confirm'); btn.textContent = `Overwrite ${mName(key)}?`;
+      setTimeout(() => { if (btn.isConnected){ btn.classList.remove('btn-danger','confirm'); btn.textContent = 'Save month'; } }, 4000); return;
+    }
+    const rec = buildRecord(key, 'chosen manually (no data date in the files)', false, new Date());
+    const ok = saveMonth(rec);
+    state.view = { key, savedAt:rec.savedAt, monthSrc:rec.monthSrc, sample:false, saved:ok };
+    if (ok) toast(`Saved ${mName(key)}`);
+    renderAll();
+  }
+
+  // ---------- sample data: three months ----------
+  function loadSample(){
+    if (!window.XLSX){ notice('err', 'The spreadsheet library could not load (no internet connection?).'); return; }
+    if (readIndex().some(x => !x.sample)){ notice('warn', 'Sample data is only loaded into an empty dashboard, so it never mixes with your stored months.'); return; }
+    const now = new Date();
+    [19, 20, 21].forEach(cut => {
+      const key = `2026-${pad2(cut - 12)}`;
+      const wb = XLSX.read(XLSX.write(PC.sampleCostWorkbook(XLSX, cut), { type:'array', bookType:'xlsx' }), { type:'array', cellDates:true });
+      const b = { cost:{}, costFiles:{}, sched:null };
+      addCost(b, wb, `sample-cost-report-${key}.xlsx`);
+      if (cut === 21) b.sched = PC.parseScheduleText(PC.sampleXER(), `sample-schedule-${key}.xer`, DOMParser);
+      useBatch(b);
+      const m = PC.reportingMonth(PC.computeCost(b.cost), b.sched);
+      saveMonth(buildRecord(m.key, m.src, true, now));
+    });
+    state.lastUpload = now;
+    const ix = readIndex();
+    if (ix.length) openMonth(ix[ix.length - 1].key);
+    else { state.view = { key:'2026-09', saved:false, sample:true }; renderAll(); }
+  }
+
+  // ---------- backup, import, CSV ----------
+  function exportMonths(keys, name){
+    const months = [], bad = [];
+    keys.forEach(k => { try { const r = loadRecord(k); if (r) months.push(r); else bad.push(k); } catch (e){ bad.push(k); } });
+    if (!months.length){ toast('Nothing to export'); return; }
+    download(name, JSON.stringify({ app:'project-controls-dashboard', kind: keys.length === 1 ? 'month' : 'backup', version:1, exportedAt:new Date(), months }), 'application/json');
+    if (bad.length) notice('warn', `Could not read ${bad.map(mName).join(', ')} from storage, so ${bad.length === 1 ? 'it is' : 'they are'} missing from the export.`);
+    else toast(`Exported ${months.length} month${months.length === 1 ? '' : 's'}`);
+  }
+  const exportAll = () => exportMonths(readIndex().map(x => x.key), `project-controls-backup-${stamp()}.json`);
+
+  async function importBackup(file){
+    let obj;
+    try { obj = JSON.parse(await readAs(file, 'text'), PC.reviveDates); } catch (e){ notice('err', `<b>“${esc(file.name)}” is not a valid backup.</b> It could not be read as JSON.`); return; }
+    const months = obj && obj.app === 'project-controls-dashboard' && Array.isArray(obj.months) ? obj.months.filter(m => m && /^\d{4}-\d{2}$/.test(m.key) && m.cost) : null;
+    if (!months || !months.length){ notice('err', `<b>“${esc(file.name)}” is not a backup from this dashboard</b>, or it contains no months.`); return; }
+    state.pendingImport = months.map(recomputeKpi);
+    const clash = months.filter(m => readIndex().some(x => x.key === m.key)).map(m => mName(m.key));
+    notice('warn', `<b>Import ${months.length} month${months.length === 1 ? '' : 's'} from “${esc(file.name)}”</b> (${months.map(m => mName(m.key)).join(', ')}).
+      ${clash.length ? `Already stored: ${esc(clash.join(', '))}.` : ''}
+      <div class="acts"><button class="btn btn-sm btn-primary" data-act="imp-merge">Merge${clash.length ? ' (backup overwrites the same months)' : ''}</button><button class="btn btn-sm btn-danger" data-act="imp-replace">Replace all stored months</button><button class="btn btn-sm btn-outline" data-act="imp-cancel">Cancel</button></div>`, 'import');
+  }
+  function doImport(replace){
+    const months = state.pendingImport || []; state.pendingImport = null;
+    if (replace) readIndex().forEach(x => deleteMonth(x.key));
+    let n = 0;
+    for (const m of months){ if (saveMonth(m)) n++; else break; }
+    toast(`Imported ${n} of ${months.length} month${months.length === 1 ? '' : 's'}`);
+    const ix = readIndex();
+    if (ix.length) openMonth(ix[ix.length - 1].key); else resetToEmpty();
+  }
+
+  function exportCSV(){
+    const ix = readIndex(); if (!ix.length){ toast('Nothing stored yet'); return; }
+    const d = x => x ? `${x.getFullYear()}-${pad2(x.getMonth()+1)}-${pad2(x.getDate())}` : '';
+    const n = (x, dp) => x == null || !isFinite(x) ? '' : (dp != null ? x.toFixed(dp) : String(Math.round(x * 100) / 100));
+    const q = s => `"${String(s == null ? '' : s).replace(/"/g, '""')}"`;
+    const head = ['Month','Project','Cost data date','Schedule data date','Currency','BAC','PV','EV','AC','SV (EV-PV)','CV (EV-AC)','SPI calc (EV/PV)','CPI calc (EV/AC)','SPI reported','CPI reported','EAC calc (BAC/CPI)','EAC reported','VAC (BAC-EAC)','Progress % (EV/BAC)','Budget used % (AC/BAC)','Schedule % complete','Planned finish','Forecast finish','Slip days','Open activities TF<=0','Negative float','Open issues','Open issue cost impact','Uploaded','Files'];
+    const rows = ix.map(x => { const k = x.kpi || {};
+      return [x.key, q(x.project), d(k.costDate), d(k.schedDate), q((k.currency || '').trim()), n(k.bac), n(k.pv), n(k.ev), n(k.ac), n(k.sv), n(k.cv), n(k.spi,3), n(k.cpi,3), n(k.spiRep,3), n(k.cpiRep,3), n(k.eac), n(k.eacRep), n(k.vac),
+        k.progress == null ? '' : n(k.progress * 100, 1), k.used == null ? '' : n(k.used * 100, 1), k.schedPct == null ? '' : n(k.schedPct * 100, 1),
+        d(k.plannedFinish), d(k.forecastFinish), n(k.slip), n(k.crit), n(k.neg), n(k.openIssues), n(k.openImpact), q(fmtDT(x.savedAt)), q([].concat(x.files.cost || [], x.files.sched || []).join(' + '))].join(','); });
+    download(`project-kpis-${stamp()}.csv`, '﻿' + [head.map(q).join(',')].concat(rows).join('\r\n'), 'text/csv');
+    toast(`KPI CSV exported (${ix.length} month${ix.length === 1 ? '' : 's'})`);
+  }
+
+  // ---------- month bar ----------
+  function renderMonthBar(){
+    const ix = readIndex(), keys = ix.map(x => x.key), k = state.view.key, pos = keys.indexOf(k), latest = keys[keys.length - 1];
+    let nav = '<div class="mb-nav"><span class="pill grey">No months stored yet</span></div>';
+    if (ix.length) nav = `<div class="mb-nav"><button class="icon-btn" id="mPrev" ${pos <= 0 ? 'disabled' : ''} title="Previous month" aria-label="Previous month">◀</button>
+      <select id="mSel" aria-label="Reporting month">${pos < 0 ? '<option value="">Unsaved upload</option>' : ''}${ix.slice().reverse().map(x => `<option value="${x.key}"${x.key === k ? ' selected' : ''}>${mName(x.key)}${x.sample ? ' (sample)' : ''}</option>`).join('')}</select>
+      <button class="icon-btn" id="mNext" ${pos < 0 || pos >= keys.length - 1 ? 'disabled' : ''} title="Next month" aria-label="Next month">▶</button>
+      ${k && k === latest ? '<span class="pill green">Latest month</span>' : `<button class="linkbtn" id="mLatest">Go to latest (${mName(latest)})</button>`}</div>`;
+    let info;
+    if (k && state.view.saved) info = `Showing <b>${mName(k)}</b>${state.view.sample ? ' (sample data)' : ''}. Month taken from ${esc(state.view.monthSrc || '—')}. Uploaded ${esc(fmtDT(state.view.savedAt))}.`;
+    else if (k) info = `<b>${mName(k)} is shown but not saved</b> because of a storage problem. <button class="btn btn-sm btn-primary" id="mRetry">Try saving again</button>`;
+    else info = `<b>Not saved yet</b> – the files have no data date. Reporting month: <input type="month" id="mManual"> <button class="btn btn-sm btn-primary" id="mSave">Save month</button>`;
+    const used = storageUsed(), frac = used / LIMIT;
+    const meter = LS ? `<div class="meter${frac > 0.8 ? ' hi' : ''}" title="Space this dashboard uses in your browser (browsers allow roughly 5 MB)"><span>Storage</span><span class="bar"><i style="width:${Math.min(100, frac * 100).toFixed(0)}%"></i></span><span>${(used / 1048576).toFixed(2)} MB of ~5 MB${frac > 0.8 ? ' – almost full' : ''}</span></div>` : '<div class="meter hi">Browser storage unavailable</div>';
+    $('monthBar').innerHTML = nav + `<div class="mb-info">${info}</div>` + meter +
+      `<div class="mb-actions"><button class="btn btn-sm btn-primary" data-act="upload">Upload files</button><button class="btn btn-sm btn-outline" data-act="backup">Export backup</button><button class="btn btn-sm btn-outline" data-act="import">Import backup</button><button class="btn btn-sm btn-outline" data-act="csv">KPI CSV</button><button class="btn btn-sm btn-outline" data-act="layout-save">Save layout</button><button class="btn btn-sm btn-outline" data-act="layout-reset">Reset layout</button></div>
+      <div class="how"><b>How to upload:</b> drop this month's cost report (.xlsx / .csv) and schedule (.xer, or .xml from MS Project / P6) anywhere on the page, together or one after the other. The reporting month is read from the data date and the month is saved in this browser only. To correct a month, use <i>Replace</i> in the Stored months table.</div>`;
+    if ($('mPrev')) $('mPrev').onclick = () => pos > 0 && openMonth(keys[pos - 1]);
+    if ($('mNext')) $('mNext').onclick = () => pos >= 0 && pos < keys.length - 1 && openMonth(keys[pos + 1]);
+    if ($('mSel')) $('mSel').onchange = e => e.target.value && openMonth(e.target.value);
+    if ($('mLatest')) $('mLatest').onclick = () => openMonth(latest);
+    if ($('mSave')) $('mSave').onclick = e => saveManual($('mManual').value, e.currentTarget);
+    if ($('mRetry')) $('mRetry').onclick = () => { const rec = buildRecord(k, state.view.monthSrc, state.view.sample, new Date()); state.view.saved = saveMonth(rec); if (state.view.saved){ state.view.savedAt = rec.savedAt; toast(`Saved ${mName(k)}`); } renderAll(); };
+  }
+
+  // ---------- project timeline ----------
+  function renderTimeline(){
+    const el = $('timeline'), ix = readIndex(), s = state.sched, sc = state._sc;
+    let start = null, pFin = null, fFin = null, src = '', startLbl = 'Start', pLbl = 'Planned finish';
+    if (s && sc){
+      s.acts.forEach(a => { const d = a.pS || a.aS || a.cS; if (d && (!start || d < start)) start = d; });
+      pFin = sc.plannedFinish; fFin = sc.forecastFinish;
+      src = `Start = earliest activity start; planned finish = latest ${s.fields.planned}; forecast finish = latest ${s.fields.current} (${s.file})`;
+    } else if (state.cost.trend && state.cost.trend.rows[0].date){
+      const rows = state.cost.trend.rows; start = rows[0].date;
+      const lastPV = rows.filter(r => r.pv != null && r.date).pop(); pFin = lastPV ? lastPV.date : null; pLbl = 'End of PV curve';
+      src = `No schedule this month: start and end are the first and last month of the trend sheet (${state.cost.trend.sheet}). A forecast finish needs a schedule file.`;
+    }
+    if (!start || !pFin){ el.innerHTML = '<div class="empty"><b>Not enough dates for a timeline</b>Needs a schedule (.xer / .xml), or a monthly trend sheet with month dates.</div>'; $('tlNote').textContent = ''; return; }
+    const dd = (s && s.dataDate) || state.cc.dataDate && state.cc.dataDate.d;
+    const endAll = new Date(Math.max(+pFin, +(fFin || 0), ...(ix.length ? ix.map(x => +PC.monthEnd(x.key)) : [0]), +(dd || 0)));
+    const t0 = new Date(start.getFullYear(), start.getMonth(), 1), t1 = new Date(endAll.getFullYear(), endAll.getMonth() + 1, 1);
+    const W = 1000, L = 20, Rr = 20, span = t1 - t0, X = d => L + (d - t0) / span * (W - L - Rr);
+    const status = x => { const k = x.kpi || {}; const v = [k.spi, k.cpi].filter(z => z != null && isFinite(z)); if (!v.length) return 'none'; return statusOf(Math.min(...v)); };
+    let svg = `<svg viewBox="0 0 ${W} 170" width="100%" style="min-width:640px" role="img" aria-label="Project timeline">
+      <defs><pattern id="hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="#fbe5e6"/><rect width="3" height="7" fill="${C.red}"/></pattern></defs>`;
+    for (let y = t0.getFullYear(); y <= t1.getFullYear(); y++) for (let m = 0; m < 12; m += 3){
+      const d = new Date(y, m, 1); if (d < t0 || d > t1) continue; const x = X(d);
+      svg += `<line x1="${x}" y1="20" x2="${x}" y2="140" stroke="#eef2f8"/><text x="${x + 3}" y="160" font-size="11" fill="#5d6b82">${MON[m]} ${String(y).slice(2)}</text>`;
+    }
+    svg += `<rect x="${X(start)}" y="42" width="${Math.max(2, X(pFin) - X(start))}" height="18" rx="4" fill="#cfe0f8" stroke="${C.blue5}"/>`;
+    if (fFin && fFin > pFin) svg += `<rect x="${X(pFin)}" y="42" width="${Math.max(2, X(fFin) - X(pFin))}" height="18" rx="3" fill="url(#hatch)" stroke="${C.red}"/>`;
+    if (fFin && fFin < pFin) svg += `<line x1="${X(fFin)}" y1="36" x2="${X(fFin)}" y2="66" stroke="${C.green}" stroke-width="3"/>`;
+    svg += `<text x="${X(start)}" y="32" font-size="12" fill="#1b2a41" font-weight="700">${startLbl} ${fmtD(start)}</text>`;
+    svg += `<text x="${X(pFin)}" y="32" font-size="12" fill="${C.blue}" font-weight="700" text-anchor="end">${pLbl} ${fmtD(pFin)}</text>`;
+    if (fFin) svg += `<text x="${Math.min(X(fFin), W - 4)}" y="78" font-size="12" fill="${fFin > pFin ? C.red : C.green}" font-weight="700" text-anchor="end">Forecast ${fmtD(fFin)} (${sc.slip > 0 ? '+' : ''}${sc.slip} d)</text>`;
+    if (dd) svg += `<line x1="${X(dd)}" y1="36" x2="${X(dd)}" y2="140" stroke="${C.red}" stroke-dasharray="4 3" stroke-width="1.5"/>`;
+    svg += `<line x1="${L}" y1="112" x2="${W - Rr}" y2="112" stroke="#cbd5e1" stroke-width="2"/>`;
+    ix.forEach(x => {
+      const d = PC.monthEnd(x.key); const cx = X(d), st = status(x), cur = x.key === state.view.key; const k = x.kpi || {};
+      svg += `<g><title>${mName(x.key)}: SPI ${r2(k.spi)}, CPI ${r2(k.cpi)}${k.slip != null ? `, slip ${k.slip} d` : ''}</title>${cur ? `<circle cx="${cx}" cy="112" r="11" fill="none" stroke="#1b2a41" stroke-width="2"/>` : ''}<circle cx="${cx}" cy="112" r="7" fill="${C[st]}" stroke="#fff" stroke-width="2"/></g>`;
+      if (cur) svg += `<text x="${cx}" y="135" font-size="11" fill="#1b2a41" font-weight="700" text-anchor="middle">${mName(x.key)}</text>`;
+    });
+    svg += '</svg>';
+    el.innerHTML = `<div class="tl-wrap">${svg}</div>
+      <div class="tl-legend"><span><i style="background:#cfe0f8;border:1px solid ${C.blue5}"></i>Planned duration</span><span><i style="background:url(#hatch);background:repeating-linear-gradient(45deg,${C.red} 0 3px,#fbe5e6 3px 7px)"></i>Forecast delay</span><span><i style="background:${C.green};border-radius:50%"></i>Stored month, SPI and CPI ≥ 1.00</span><span><i style="background:${C.orange};border-radius:50%"></i>lowest of SPI/CPI 0.90–0.99</span><span><i style="background:${C.red};border-radius:50%"></i>&lt; 0.90</span><span><i style="background:${C.none};border-radius:50%"></i>no SPI/CPI</span><span><i style="background:none;border-top:2px dashed ${C.red};height:0"></i>Data date</span></div>
+      <div class="src"><b>Source</b>${esc(src)}. Dots: one per stored month at month end, coloured by the lower of that month's calculated SPI and CPI.</div>`;
+    $('tlNote').textContent = `${ix.length} stored month${ix.length === 1 ? '' : 's'}`;
+  }
+
+  // ---------- lifecycle charts ----------
+  function renderLifecycle(){
+    const ix = readIndex(), ids = ['lcIdx','lcCost','lcProg','lcSlip'];
+    if (!ix.length){ ids.forEach(id => emptyBox(id, 'No stored months', 'Upload a month to start the history.')); $('lcNote').textContent = ''; return; }
+    if (typeof Chart === 'undefined'){ ids.forEach(id => emptyBox(id, 'Chart library not loaded', 'Charts need an internet connection to load Chart.js.')); return; }
+    $('lcNote').textContent = ix.length < 2 ? 'Only one month stored – upload more months to see a trend' : `${ix.length} months, ${mName(ix[0].key)} – ${mName(ix[ix.length - 1].key)}`;
+    const labels = ix.map(x => mName(x.key)), K = f => ix.map(x => { const v = (x.kpi || {})[f]; return v == null || !isFinite(v) ? null : v; });
+    const cur = ix.findIndex(x => x.key === state.view.key);
+    const pr = n => ix.map((x,i) => i === cur ? n + 3 : n);
+    const grid = { color:'#eef2f8' };
+    const base = (extra) => Object.assign({ responsive:true, maintainAspectRatio:false, interaction:{ mode:'index', intersect:false }, spanGaps:true,
+      plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8 } } }, scales:{ x:{ grid:{ display:false } } } }, extra);
+    const srcTxt = 'Each point is calculated from that stored month exactly as on the KPI cards.';
+    const sp = K('spi'), cp = K('cpi'), all = sp.concat(cp).filter(v => v != null);
+    const lo = Math.min(0.85, ...all) - 0.03, hi = Math.max(1.1, ...all) + 0.03;
+    charts.push(new Chart(box('lcIdx', 260), { type:'line', data:{ labels, datasets:[
+      { label:'SPI', data:sp, borderColor:C.blue5, backgroundColor:C.blue5, pointRadius:pr(3), borderWidth:2.2, tension:.2 },
+      { label:'CPI', data:cp, borderColor:'#e0662f', backgroundColor:'#e0662f', pointRadius:pr(3), borderWidth:2.2, tension:.2 },
+      { label:'1.00', data:labels.map(() => 1), borderColor:'#94a3b8', borderDash:[4,4], borderWidth:1.2, pointRadius:0 } ] },
+      options: base({ plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8, filter:i => i.text !== '1.00' } }, tooltip:{ filter:i => i.dataset.label !== '1.00', callbacks:{ label:x => ` ${x.dataset.label}: ${x.parsed.y.toFixed(2)}` } } },
+        scales:{ x:{ grid:{ display:false } }, y:{ min:Math.floor(lo*20)/20, max:Math.ceil(hi*20)/20, grid, ticks:{ callback:v => (+v).toFixed(2) } } } }) }));
+    setSrc('lcIdx', `<b>Source</b>${srcTxt}`);
+    charts.push(new Chart(box('lcCost', 260), { type:'line', data:{ labels, datasets:[
+      { label:'PV', data:K('pv'), borderColor:C.blue5, backgroundColor:C.blue5, pointRadius:pr(3), borderWidth:2 },
+      { label:'EV', data:K('ev'), borderColor:C.green, backgroundColor:C.green, pointRadius:pr(3), borderWidth:2 },
+      { label:'AC', data:K('ac'), borderColor:'#e0662f', backgroundColor:'#e0662f', pointRadius:pr(3), borderWidth:2 },
+      { label:'EAC (BAC ÷ CPI)', data:K('eac'), borderColor:C.red, backgroundColor:C.red, pointRadius:pr(2), borderWidth:1.6, borderDash:[2,3] },
+      { label:'BAC', data:K('bac'), borderColor:'#1b2a41', backgroundColor:'#1b2a41', pointRadius:0, borderWidth:1.4, borderDash:[6,4] } ] },
+      options: base({ plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8 } }, tooltip:{ callbacks:{ label:x => ` ${x.dataset.label}: ${money(x.parsed.y)}` } } },
+        scales:{ x:{ grid:{ display:false } }, y:{ grid, ticks:{ callback:v => money(v) } } } }) }));
+    setSrc('lcCost', `<b>Source</b>${srcTxt}`);
+    const p100 = f => K(f).map(v => v == null ? null : v * 100);
+    charts.push(new Chart(box('lcProg', 260), { type:'line', data:{ labels, datasets:[
+      { label:'Cost progress (EV ÷ BAC)', data:p100('progress'), borderColor:C.blue, backgroundColor:C.blue, pointRadius:pr(3), borderWidth:2 },
+      { label:'Schedule % complete', data:p100('schedPct'), borderColor:C.indigo, backgroundColor:C.indigo, pointRadius:pr(3), borderWidth:2, borderDash:[5,3] },
+      { label:'Budget used (AC ÷ BAC)', data:p100('used'), borderColor:'#e0662f', backgroundColor:'#e0662f', pointRadius:pr(2), borderWidth:1.6 } ] },
+      options: base({ plugins:{ legend:{ position:'bottom', labels:{ usePointStyle:true, boxWidth:8 } }, tooltip:{ callbacks:{ label:x => ` ${x.dataset.label}: ${x.parsed.y.toFixed(1)}%` } } },
+        scales:{ x:{ grid:{ display:false } }, y:{ min:0, max:100, grid, ticks:{ callback:v => v + '%' } } } }) }));
+    setSrc('lcProg', `<b>Source</b>${srcTxt} Schedule % only for months with a schedule file.`);
+    const sl = K('slip');
+    if (sl.every(v => v == null)) emptyBox('lcSlip', 'No schedule in the stored months', 'Slip needs a schedule (.xer / .xml) with planned and current dates.');
+    else {
+      charts.push(new Chart(box('lcSlip', 260), { type:'bar', data:{ labels, datasets:[{ label:'Slip (days)', data:sl, backgroundColor:sl.map(v => v > 0 ? C.red : C.green), borderRadius:4 }] },
+        options: base({ plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:x => ` ${x.parsed.y > 0 ? '+' : ''}${x.parsed.y} days` } } }, scales:{ x:{ grid:{ display:false } }, y:{ grid, ticks:{ precision:0 }, title:{ display:true, text:'days' } } } }) }));
+      setSrc('lcSlip', `<b>Source</b>Forecast finish − planned finish from each month's schedule. Months without a schedule are blank.`);
+    }
+  }
+
+  // ---------- month vs month ----------
+  function renderCompare(){
+    const ix = readIndex(), el = $('compare');
+    if (ix.length < 2){ el.innerHTML = '<div class="empty"><b>Store at least two months to compare</b>Each month you upload is kept, so next month this table fills in automatically.</div>'; $('cmpNote').textContent = ''; return; }
+    const keys = ix.map(x => x.key);
+    let b = keys.includes(state.cmpB) ? state.cmpB : (keys.includes(state.view.key) ? state.view.key : keys[keys.length - 1]);
+    let a = keys.includes(state.cmpA) && state.cmpA !== b ? state.cmpA : keys[keys.indexOf(b) - 1];
+    if (!a || a === b){ a = b; b = keys[keys.indexOf(b) + 1]; }   // viewed month is the first one: compare it with the next
+    state.cmpA = a; state.cmpB = b;
+    const A = ix.find(x => x.key === a).kpi || {}, B = ix.find(x => x.key === b).kpi || {};
+    const ok = v => v != null && (v instanceof Date || isFinite(v));
+    const F = { money:v => money(v), idx:v => r2(v), pct:v => pct(v), int:v => String(v), date:v => fmtD(v) };
+    const sg = (x, dp) => { const r = +x.toFixed(dp); return r === 0 ? (0).toFixed(dp) : (r > 0 ? '+' : '−') + Math.abs(r).toFixed(dp); };
+    const D = { money:d => money(d, true), idx:d => sg(d, 2), pct:d => sg(d * 100, 1) + ' pts', int:d => sg(d, 0), date:d => sg(d, 0) + ' d' };
+    const R = [ ['Cost'], ['BAC','bac','money',0], ['PV – planned value','pv','money',0], ['EV – earned value','ev','money',1], ['AC – actual cost','ac','money',0],
+      ['SV = EV − PV','sv','money',1], ['CV = EV − AC','cv','money',1], ['SPI = EV ÷ PV','spi','idx',1], ['CPI = EV ÷ AC','cpi','idx',1],
+      ['EAC = BAC ÷ CPI','eac','money',-1], ['EAC reported','eacRep','money',-1], ['VAC = BAC − EAC','vac','money',1], ['Progress = EV ÷ BAC','progress','pct',1], ['Budget used = AC ÷ BAC','used','pct',0],
+      ['Schedule'], ['Schedule % complete','schedPct','pct',1], ['Forecast finish','forecastFinish','date',-1], ['Slip vs planned finish (days)','slip','int',-1], ['Open activities, TF ≤ 0','crit','int',-1], ['Negative float','neg','int',-1], ['Activities complete','complete','int',1],
+      ['Issues & risks'], ['Open items','openIssues','int',-1], ['Open cost impact','openImpact','money',-1] ];
+    const rows = R.map(r => {
+      if (r.length === 1) return `<tr class="sub"><td colspan="4">${r[0]}</td></tr>`;
+      const [lbl, f, t, dir] = r, va = A[f], vb = B[f];
+      let chg = '—', cls = '';
+      if (ok(va) && ok(vb)){
+        const d = t === 'date' ? Math.round((new Date(vb.getFullYear(), vb.getMonth(), vb.getDate()) - new Date(va.getFullYear(), va.getMonth(), va.getDate())) / 864e5) : vb - va;
+        chg = D[t](d); if (dir && Math.abs(d) >= ({ idx:0.005, pct:0.0005 }[t] || 0.5)) cls = (d > 0) === (dir > 0) ? 'chg-good' : 'chg-bad';
+      }
+      return `<tr><td>${lbl}</td><td class="num">${ok(va) ? esc(F[t](va)) : '—'}</td><td class="num">${ok(vb) ? esc(F[t](vb)) : '—'}</td><td class="num ${cls}">${esc(chg)}</td></tr>`;
+    }).join('');
+    const dEV = ok(A.ev) && ok(B.ev) ? B.ev - A.ev : null, dAC = ok(A.ac) && ok(B.ac) ? B.ac - A.ac : null, dPV = ok(A.pv) && ok(B.pv) ? B.pv - A.pv : null;
+    const per = [ ['Cost spent between the months', dAC, 'AC(B) − AC(A)', 'money'], ['Value earned between the months', dEV, 'EV(B) − EV(A)', 'money'], ['Value planned between the months', dPV, 'PV(B) − PV(A)', 'money'],
+      ['Period CPI', dEV != null && dAC ? dEV / dAC : null, 'ΔEV ÷ ΔAC', 'idx'], ['Period SPI', dEV != null && dPV ? dEV / dPV : null, 'ΔEV ÷ ΔPV', 'idx'] ];
+    const sel = (id, v) => `<select id="${id}">${keys.slice().reverse().map(k => `<option value="${k}"${k === v ? ' selected' : ''}>${mName(k)}</option>`).join('')}</select>`;
+    el.innerHTML = `<div class="cmp-ctrl"><label>Month A ${sel('cmpA', a)}</label><span>→</span><label>Month B ${sel('cmpB', b)}</label>${a > b ? '<span class="pill orange">A is later than B</span>' : ''}</div>
+      <div class="grid2"><div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>KPI</th><th>${mName(a)}</th><th>${mName(b)}</th><th>Change B − A</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div><div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Between ${mName(a)} and ${mName(b)}</th><th>Value</th><th>Formula</th></tr></thead><tbody>${per.map(([l,v,f,t]) => `<tr><td>${l}</td><td class="num">${v == null || !isFinite(v) ? '—' : esc(t === 'idx' ? r2(v) : money(v))}</td><td style="color:var(--muted)">${f}</td></tr>`).join('')}</tbody></table></div>
+      <div class="src"><b>Source</b>Values come from the two stored months, calculated as on the KPI cards. Green = better, red = worse. “—” means one of the months lacks that input.</div></div></div>`;
+    $('cmpNote').textContent = `${mName(a)} → ${mName(b)}`;
+    $('cmpA').onchange = e => { state.cmpA = e.target.value; renderCompare(); };
+    $('cmpB').onchange = e => { state.cmpB = e.target.value; renderCompare(); };
+  }
+
+  // ---------- stored months table ----------
+  function renderMonthsTable(){
+    const ix = readIndex(), el = $('monthsTable');
+    if (!ix.length){ el.innerHTML = '<div class="empty"><b>No months stored</b>Uploaded months appear here.</div>'; $('monthsNote').textContent = ''; return; }
+    const latest = ix[ix.length - 1].key;
+    $('monthsNote').textContent = `${ix.length} month${ix.length === 1 ? '' : 's'} · ${(storageUsed() / 1048576).toFixed(2)} MB used`;
+    const rows = ix.slice().reverse().map(x => { const k = x.kpi || {};
+      return `<tr${x.key === state.view.key ? ' style="background:#f4f8ff"' : ''}><td><b>${mName(x.key)}</b> ${x.key === latest ? '<span class="pill green">Latest</span>' : ''}${x.sample ? ' <span class="pill orange">Sample</span>' : ''}${x.key === state.view.key ? ' <span class="pill blue">Showing</span>' : ''}</td>
+        <td>${esc(x.project || '—')}</td><td class="num">${esc(fmtD(k.costDate || k.schedDate))}</td><td style="font-size:12px;color:var(--muted)">${esc([].concat(x.files.cost || [], x.files.sched || []).join(', '))}</td>
+        <td class="num">${esc(fmtDT(x.savedAt))}</td><td class="num">${(x.size / 1024).toFixed(0)} KB</td>
+        <td class="num">${k.spi != null ? `<span class="pill ${statusOf(k.spi)}">${r2(k.spi)}</span>` : '—'}</td><td class="num">${k.cpi != null ? `<span class="pill ${statusOf(k.cpi)}">${r2(k.cpi)}</span>` : '—'}</td>
+        <td><div class="act-btns"><button data-act="m-open" data-key="${x.key}">Open</button><button data-act="m-replace" data-key="${x.key}">Replace</button><button data-act="m-export" data-key="${x.key}">Export</button><button data-act="m-delete" data-key="${x.key}">Delete</button></div></td></tr>`; }).join('');
+    el.innerHTML = `<div class="tbl-wrap" style="max-height:none"><table class="tbl"><thead><tr><th>Month</th><th>Project</th><th>Data date</th><th>Files</th><th>Uploaded</th><th>Size</th><th>SPI</th><th>CPI</th><th>Actions</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="src"><b>Note</b>Months live in this browser only (localStorage, compressed). Clearing browser data deletes them – export a backup regularly. <button class="linkbtn" data-act="m-delete-all" style="margin-left:8px;color:var(--red)">Delete all months</button></div>`;
+  }
+
+  function twoClick(btn, label, fn){
+    if (btn.classList.contains('confirm')){ fn(); return; }
+    const old = btn.textContent; btn.classList.add('confirm'); btn.textContent = label;
+    setTimeout(() => { if (btn.isConnected && btn.classList.contains('confirm')){ btn.classList.remove('confirm'); btn.textContent = old; } }, 4000);
+  }
+
+  // ---------- panel layout ----------
+  let DEFAULT_ORDER = [], dragSec = null;
+  const currentOrder = () => [...document.querySelectorAll('#panels > .psec')].map(s => s.dataset.pid);
+  function applyOrder(order){
+    const p = $('panels'), known = new Set(order);
+    order.forEach(id => { const s = p.querySelector(`:scope > .psec[data-pid="${id}"]`); if (s) p.appendChild(s); });
+    DEFAULT_ORDER.filter(id => !known.has(id)).forEach(id => { const s = p.querySelector(`:scope > .psec[data-pid="${id}"]`); if (s) p.appendChild(s); });
+  }
+  function initLayout(){
+    DEFAULT_ORDER = currentOrder();
+    document.querySelectorAll('#panels > .psec').forEach(sec => {
+      const t = sec.querySelector('.section-title');
+      const h = document.createElement('span'); h.className = 'handle'; h.textContent = '⋮⋮'; h.title = 'Drag to move this panel'; h.draggable = true; h.setAttribute('aria-hidden','true');
+      t.insertBefore(h, t.firstChild);
+      const mv = document.createElement('span'); mv.className = 'mv';
+      mv.innerHTML = '<button type="button" data-mv="-1" title="Move up" aria-label="Move panel up">▲</button><button type="button" data-mv="1" title="Move down" aria-label="Move panel down">▼</button>';
+      t.appendChild(mv);
+      h.addEventListener('dragstart', e => { dragSec = sec; sec.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', sec.dataset.pid); e.dataTransfer.setDragImage(sec, 20, 20); } catch (_){} });
+      h.addEventListener('dragend', () => { if (dragSec) dragSec.classList.remove('dragging'); dragSec = null; document.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before','drop-after')); });
+    });
+    $('panels').addEventListener('dragover', e => {
+      if (!dragSec) return; e.preventDefault();
+      const tgt = e.target.closest && e.target.closest('#panels > .psec');
+      document.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before','drop-after'));
+      if (!tgt || tgt === dragSec) return;
+      const r = tgt.getBoundingClientRect(); tgt.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after');
+    });
+    $('panels').addEventListener('drop', e => {
+      if (!dragSec) return; e.preventDefault(); e.stopPropagation();
+      const tgt = document.querySelector('#panels > .drop-before, #panels > .drop-after');
+      if (tgt){ tgt.classList.contains('drop-before') ? tgt.before(dragSec) : tgt.after(dragSec); toast('Panel moved – press Save layout to keep this order'); }
+      document.querySelectorAll('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before','drop-after'));
+      dragSec.classList.remove('dragging'); dragSec = null;
+    });
+    $('panels').addEventListener('click', e => {
+      const b = e.target.closest('[data-mv]'); if (!b) return;
+      const sec = b.closest('.psec'), dir = +b.dataset.mv;
+      const sib = dir < 0 ? sec.previousElementSibling : sec.nextElementSibling;
+      if (sib){ dir < 0 ? sib.before(sec) : sib.after(sec); sec.scrollIntoView && sec.scrollIntoView({ block:'nearest' }); }
+    });
+    try { const saved = LS && JSON.parse(LS.getItem(LAYOUT) || 'null'); if (Array.isArray(saved)) applyOrder(saved); } catch (_){}
+  }
+  function saveLayout(){ if (!LS){ toast('Browser storage is unavailable'); return; } try { LS.setItem(LAYOUT, JSON.stringify(currentOrder())); toast('Layout saved'); } catch (e){ isQuota(e) ? storageFull('the layout') : toast('Could not save the layout'); } }
+  function resetLayout(){ if (LS) LS.removeItem(LAYOUT); applyOrder(DEFAULT_ORDER); toast('Layout reset to default'); }
+
+  // ---------- main render ----------
+  function renderAll(){
+    const cc = PC.computeCost(state.cost); state.cc = cc;
+    money = (n, plus) => PC.fmtMoney(n, cc.currency, plus);
+    const sc = state.sched ? PC.computeSchedule(state.sched, nearDays()) : null; state._sc = sc;
+    const q = PC.qualityChecks(state.cost, cc, state.sched, sc);
+    renderHeader(cc); renderMonthBar(); renderFiles(); renderKPIs(cc); renderFigs(cc); renderQuality(q);
+    renderSchedCards(sc); renderCharts(sc); renderTimeline(); renderLifecycle(); renderCompare(); renderGantt(sc); renderIssues(); renderWPs(); renderMonthsTable();
+    $('upload').style.display = 'none'; $('dash').style.display = 'block'; $('headActions').style.display = 'flex';
+    $('foot').textContent = 'Every value on this page is read from the loaded files or calculated from them, and shows its source. Nothing is estimated or filled in. Months are stored only in this browser. Thresholds: green ≥ 1.00 · orange 0.90–0.99 · red < 0.90. Built by Sara Mostafshar with Claude.';
+  }
+
+  // ---------- wiring ----------
+  const hidden = (accept, multiple) => { const i = document.createElement('input'); i.type = 'file'; i.accept = accept; i.multiple = !!multiple; i.hidden = true; document.body.appendChild(i); return i; };
+  const replaceInput = hidden('.xlsx,.xls,.xlsm,.csv,.xer,.xml', true), importInput = hidden('.json', false);
+  replaceInput.onchange = e => { const k = replaceInput.dataset.key; handleFiles(e.target.files, { replaceKey:k }); e.target.value = ''; };
+  importInput.onchange = e => { if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; };
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const act = b.dataset.act, key = b.dataset.key;
+    if (act === 'upload') $('fileInput').click();
+    else if (act === 'backup') exportAll();
+    else if (act === 'import') importInput.click();
+    else if (act === 'csv') exportCSV();
+    else if (act === 'layout-save') saveLayout();
+    else if (act === 'layout-reset') resetLayout();
+    else if (act === 'goto-months'){ const s = $('monthsSec'); if (s && s.scrollIntoView) s.scrollIntoView({ behavior:'smooth' }); }
+    else if (act === 'pend-replace' || act === 'pend-add'){ const p = state.pending; state.pending = null; b.closest('.msg').remove(); if (p) commit(p.batch, p.key, p.src, act === 'pend-add'); }
+    else if (act === 'pend-cancel'){ state.pending = null; b.closest('.msg').remove(); toast('Upload cancelled – the stored month is unchanged'); }
+    else if (act === 'imp-merge' || act === 'imp-replace'){ const go = () => { b.closest('.msg').remove(); doImport(act === 'imp-replace'); }; act === 'imp-replace' ? twoClick(b, 'Click again to replace everything', go) : go(); }
+    else if (act === 'imp-cancel'){ state.pendingImport = null; b.closest('.msg').remove(); }
+    else if (act === 'm-open') openMonth(key);
+    else if (act === 'm-replace'){ replaceInput.dataset.key = key; toast(`Choose the files that should replace ${mName(key)}`); replaceInput.click(); }
+    else if (act === 'm-export') exportMonths([key], `project-controls-${key}.json`);
+    else if (act === 'm-delete') twoClick(b, 'Confirm delete', () => {
+      deleteMonth(key); toast(`Deleted ${mName(key)}`);
+      const ix = readIndex();
+      if (state.view.key === key){ if (ix.length) openMonth(ix[ix.length - 1].key); else resetToEmpty(); }
+      else renderAll();
+    });
+    else if (act === 'm-delete-all') twoClick(b, 'Click again to delete ALL months', () => { readIndex().forEach(x => deleteMonth(x.key)); toast('All months deleted'); resetToEmpty(); });
+  });
+
+  $('btnPick').onclick = () => $('fileInput').click();
+  $('btnAdd').onclick = () => $('fileInput').click();
+  $('fileInput').onchange = e => { handleFiles(e.target.files); e.target.value = ''; };
+  $('btnSample').onclick = loadSample;
+  $('btnTplCost').onclick = () => { if (window.XLSX) XLSX.writeFile(PC.sampleCostWorkbook(XLSX, 21), 'sample-cost-report.xlsx', { cellDates:true }); else notice('err', 'The spreadsheet library could not load.'); };
+  $('btnTplXer').onclick = () => download('sample-schedule.xer', PC.sampleXER());
+  ['fOpen','fCrit'].forEach(id => $(id).onchange = () => { if (state.sched) renderGantt(PC.computeSchedule(state.sched, nearDays())); });
+  $('nearDays').oninput = () => { if (state.sched){ const sc = PC.computeSchedule(state.sched, nearDays()); renderSchedCards(sc); renderGantt(sc); } };
+  let depth = 0;
+  const hasFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+  window.addEventListener('dragenter', e => { if (!hasFiles(e)) return; e.preventDefault(); depth++; document.body.classList.add('drag'); });
+  window.addEventListener('dragleave', e => { if (!hasFiles(e)) return; e.preventDefault(); if (--depth <= 0){ depth = 0; document.body.classList.remove('drag'); } });
+  window.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
+  window.addEventListener('drop', e => { if (dragSec || !hasFiles(e)) return; e.preventDefault(); depth = 0; document.body.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+
+  initLayout();
+  if (!LS) notice('warn', '<b>Browser storage is not available</b> (private window or blocked by a setting). The dashboard works, but months cannot be saved between visits.', 'nols');
+  { const ix = readIndex(); if (ix.length) openMonth(ix[ix.length - 1].key); }
+  window.__pc = { state, handleFiles, loadSample, openMonth, readIndex, exportCSV, exportAll, importBackup, doImport, saveLayout, resetLayout };
+})();
+</script>
+</body>
+</html>
