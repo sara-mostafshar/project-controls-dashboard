@@ -19,4 +19,4 @@ To use your own data, see *HOW TO USE.txt* inside the sample-data zip.
 
 🔒 Files are read in your browser only; stored months stay in your browser. The sample project (RBHP) is fictional.
 
-Built by [Sara Mostafshar](https://sara-mostafshar.github.io) with Claude · AI agents and free tools for project controllers
+Built by [Sara Mostafshar](https://sara-mostafshar.github.io) with Claude · AI agents and free tools for project controllers and project managers
