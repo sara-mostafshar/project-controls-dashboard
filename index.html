@@ -219,6 +219,15 @@
   @media (max-width:900px){ .grid4{grid-template-columns:1fr} }
   @media print{ .monthbar .mb-actions,.monthbar .icon-btn,.handle,.mv,.act-btns,#monthsSec{display:none!important} }
 </style>
+<style>
+.yt-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.yt-links a{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font:600 14px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;text-decoration:none}
+.yt-links a.yt-watch{background:#ff0000;color:#fff}
+.yt-links a.yt-watch:hover{background:#d90000}
+.yt-links a.yt-sub{background:#fff;color:#14213d;border:1px solid #d5dae3}
+.yt-links a.yt-sub:hover{background:#f2f4f8}
+@media print{.yt-links{display:none!important}}
+</style>
 </head>
 <body>
 <header>
@@ -227,6 +236,10 @@
       <p class="eyebrow">Project Controls Dashboard</p>
       <h1 id="projName">Cost &amp; Schedule Performance</h1>
       <div class="meta" id="metaChips"><span class="chip">Load a cost report and/or a schedule to begin</span></div>
+    <div class="yt-links">
+      <a class="yt-watch" href="https://youtu.be/Gl09r2QoJ2w" target="_blank" rel="noopener">&#9654; Watch the 3-min video on YouTube</a>
+      <a class="yt-sub" href="https://www.youtube.com/@saramostafshar7216?sub_confirmation=1" target="_blank" rel="noopener">Subscribe to my channel</a>
+    </div>
     </div>
     <div class="head-actions" id="headActions" style="display:none">
       <button class="btn btn-light" id="btnAdd">Add files</button>
