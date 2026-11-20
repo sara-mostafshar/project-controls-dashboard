@@ -2033,6 +2033,20 @@
 })();
 </script>
 <!-- Visitor count (GoatCounter, no cookies) -->
+<script>
+/* Anonymous usage counting with GoatCounter: only button names are sent, never file contents or data. */
+(function(){
+  function gc(name){ try{ if(window.goatcounter&&window.goatcounter.count) window.goatcounter.count({path:name,title:name,event:true}); }catch(e){} }
+  var CLICKS=[["#btnSample","pcd-try-sample"],["#btnTplCost","pcd-download-sample-cost"],["#btnTplXer","pcd-download-sample-schedule"],["a[href$=\".zip\"]","pcd-download-sample-zip"],["button[onclick*=\"print\"]","pcd-print-pdf"],["a.yt-watch","pcd-youtube-video"],["a.yt-sub","pcd-youtube-subscribe"]];
+  var CHANGES=[["#fileInput","pcd-upload-own-files"]];
+  document.addEventListener("click",function(e){
+    for(var i=0;i<CLICKS.length;i++){ var el=e.target.closest&&e.target.closest(CLICKS[i][0]); if(el){ var n=CLICKS[i][1]; gc(typeof n==="function"?n(el):n); return; } }
+  },true);
+  document.addEventListener("change",function(e){
+    for(var i=0;i<CHANGES.length;i++){ if(e.target.matches&&e.target.matches(CHANGES[i][0])&&e.target.files&&e.target.files.length){ gc(CHANGES[i][1]); return; } }
+  },true);
+})();
+</script>
 <script data-goatcounter="https://saramostafshar.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
