@@ -19,4 +19,10 @@ To use your own data, see *HOW TO USE.txt* inside the sample-data zip.
 
 🔒 Files are read in your browser only; stored months stay in your browser. The sample project (RBHP) is fictional.
 
+## Use the online version
+Please use the online version for the latest tested release: https://sara-mostafshar.github.io/project-controls-dashboard/ – downloaded copies do not receive fixes and updates.
+
+## License
+Free to use, share and adapt under the [MIT License](LICENSE). Please keep the credit to Sara Mostafshar.
+
 Built by [Sara Mostafshar](https://sara-mostafshar.github.io) with Claude · AI agents and free tools for project controllers and project managers
